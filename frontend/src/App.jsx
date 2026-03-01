@@ -39,21 +39,29 @@ export default function App() {
     try {
       const apiEndpoint = import.meta.env.DEV ? `/api/search` : `/.netlify/functions/search`;
       const cleanArtist = (song.artist || '').replace(/ - Topic/gi, '').split(',')[0].trim() || 'popular blockbusters';
-      const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(cleanArtist + ' hit songs')}`);
+      // Search for normal 'song audio' rather than 'hit songs' to minimize getting jukeboxes
+      const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(cleanArtist + ' track audio')}`);
       const data = await res.json();
 
       const firstWord = song.title.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, "");
-      const filteredQueue = data.filter(s =>
-        s.id !== song.id &&
-        s.durationSeconds < 420 && // Keep only singles, block jukeboxes
-        !s.title.toLowerCase().includes("jukebox") &&
-        !s.title.toLowerCase().includes("collection") &&
-        (firstWord.length < 3 || !s.title.toLowerCase().includes(firstWord))
-      );
+      const badWords = ["hits", "hit", "jukebox", "vol", "volume", "mashup", "collection", "non stop", "nonstop", "bgm", "compilation"];
+
+      const filteredQueue = data.filter(s => {
+        if (s.id === song.id) return false;
+        if (s.durationSeconds && s.durationSeconds > 420) return false; // Over 7 mins is disqualified
+
+        const lowerTitle = s.title.toLowerCase();
+        for (let word of badWords) {
+          if (lowerTitle.includes(word)) return false; // Contains jukebox / hit keywords
+        }
+        if (firstWord.length >= 3 && lowerTitle.includes(firstWord)) return false; // Same title check
+
+        return true;
+      });
 
       const shuffledQueue = filteredQueue.sort(() => 0.5 - Math.random());
 
-      setQueue(shuffledQueue.length > 0 ? shuffledQueue : data);
+      setQueue(shuffledQueue.length > 0 ? shuffledQueue : data.slice(0, 5));
     } catch (err) {
       console.error(err);
     } finally {
