@@ -45,10 +45,15 @@ export default function App() {
       const firstWord = song.title.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, "");
       const filteredQueue = data.filter(s =>
         s.id !== song.id &&
+        s.durationSeconds < 420 && // Keep only singles, block jukeboxes
+        !s.title.toLowerCase().includes("jukebox") &&
+        !s.title.toLowerCase().includes("collection") &&
         (firstWord.length < 3 || !s.title.toLowerCase().includes(firstWord))
       );
 
-      setQueue(filteredQueue.length > 0 ? filteredQueue : data);
+      const shuffledQueue = filteredQueue.sort(() => 0.5 - Math.random());
+
+      setQueue(shuffledQueue.length > 0 ? shuffledQueue : data);
     } catch (err) {
       console.error(err);
     } finally {
