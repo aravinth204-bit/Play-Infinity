@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import ReactPlayer from 'react-player/youtube';
+import ReactPlayer from 'react-player';
 import { Home, Music, Search, User, Play, Pause, SkipBack, SkipForward, Heart, MoreHorizontal, ArrowLeft, Shuffle, Repeat, Upload } from 'lucide-react';
 import { formatTime } from './utils';
 
@@ -12,6 +12,8 @@ export default function App() {
   const [duration, setDuration] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [queue, setQueue] = useState([]);
+  const [isFetchingQueue, setIsFetchingQueue] = useState(false);
   const playerRef = useRef(null);
 
   const searchYoutube = async (e) => {
@@ -32,10 +34,42 @@ export default function App() {
     }
   };
 
-  const playSong = (song) => {
+  const fetchQueue = async (song) => {
+    setIsFetchingQueue(true);
+    try {
+      const apiEndpoint = import.meta.env.DEV ? `/api/search` : `/.netlify/functions/search`;
+      const cleanArtist = (song.artist || '').replace(/ - Topic/gi, '').split(',')[0].trim() || 'popular blockbusters';
+      const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(cleanArtist + ' hit songs')}`);
+      const data = await res.json();
+
+      const firstWord = song.title.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, "");
+      const filteredQueue = data.filter(s =>
+        s.id !== song.id &&
+        (firstWord.length < 3 || !s.title.toLowerCase().includes(firstWord))
+      );
+
+      setQueue(filteredQueue.length > 0 ? filteredQueue : data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsFetchingQueue(false);
+    }
+  };
+
+  const playSong = (song, fromQueue = false) => {
     setCurrentSong(song);
     setIsPlaying(true);
     setActiveTab('Music');
+
+    if (!fromQueue) {
+      setQueue([]);
+      fetchQueue(song);
+    } else {
+      setQueue(prev => prev.filter(s => s.id !== song.id));
+      if (queue.length <= 2) {
+        fetchQueue(song);
+      }
+    }
   };
 
   const togglePlay = () => {
@@ -59,20 +93,25 @@ export default function App() {
   };
 
   const playNext = () => {
-    if (!currentSong || songs.length === 0) return;
-    const idx = songs.findIndex(s => s.id === currentSong.id);
-    if (idx !== -1 && idx < songs.length - 1) {
-      playSong(songs[idx + 1]);
-    } else {
-      playSong(songs[0]); // loop back
+    if (queue.length > 0) {
+      playSong(queue[0], true);
+    } else if (songs.length > 0) {
+      const idx = songs.findIndex(s => s.id === currentSong?.id);
+      if (idx !== -1 && idx < songs.length - 1) {
+        playSong(songs[idx + 1]);
+      } else {
+        playSong(songs[0]); // loop back
+      }
     }
   };
 
   const playPrev = () => {
-    if (!currentSong || songs.length === 0) return;
-    const idx = songs.findIndex(s => s.id === currentSong.id);
+    if (songs.length === 0 && queue.length === 0) return;
+    const idx = songs.findIndex(s => s.id === currentSong?.id);
     if (idx > 0) {
       playSong(songs[idx - 1]);
+    } else if (songs.length > 0) {
+      playSong(songs[0]);
     }
   };
 
@@ -227,13 +266,35 @@ export default function App() {
                   </div>
 
                   {/* Up Next Mini preview */}
-                  {songs.length > 0 && (
-                    <div className="mt-8 flex items-center justify-between w-full bg-white/40 p-3 rounded-2xl shadow-sm backdrop-blur-md text-sm text-gray-600 font-medium">
+                  <div className="mt-8 w-full w-full">
+                    <div className="flex items-center justify-between bg-white/40 p-3 rounded-2xl shadow-sm backdrop-blur-md text-sm text-gray-800 font-bold mb-3 z-10 relative">
                       <span className="flex items-center gap-2">
-                        <Upload size={16} className="rotate-90" /> Up Next
+                        <Upload size={16} className="rotate-90 text-[#ff9eb1]" /> Up Next
                       </span>
+                      {isFetchingQueue && <div className="w-4 h-4 border-2 border-[#ff9eb1] border-t-transparent rounded-full animate-spin"></div>}
                     </div>
-                  )}
+
+                    {queue.length > 0 ? (
+                      <div className="space-y-3 pb-8 relative z-10">
+                        {queue.slice(0, 3).map(song => (
+                          <div
+                            key={song.id}
+                            onClick={() => playSong(song, true)}
+                            className="flex items-center gap-3 bg-white/20 hover:bg-white/40 p-2 rounded-xl cursor-pointer transition-all border border-white/20"
+                          >
+                            <img src={song.thumbnail} alt={song.title} className="w-10 h-10 rounded-lg object-cover shadow-sm min-w-[40px]" />
+                            <div className="flex-1 overflow-hidden">
+                              <h4 className="font-semibold text-gray-800 text-xs truncate">{song.title}</h4>
+                              <p className="text-[10px] text-gray-500 truncate">{song.artist}</p>
+                            </div>
+                            <button className="text-[#ff9eb1] opacity-80 hover:opacity-100 mr-2"><Play size={16} fill="currentColor" /></button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      !isFetchingQueue && <p className="text-xs text-center text-gray-400 pb-8 mt-2">End of queue</p>
+                    )}
+                  </div>
 
                 </div>
               ) : (
