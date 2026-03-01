@@ -38,9 +38,21 @@ export default function App() {
     setIsFetchingQueue(true);
     try {
       const apiEndpoint = import.meta.env.DEV ? `/api/search` : `/.netlify/functions/search`;
-      const cleanArtist = (song.artist || '').replace(/ - Topic/gi, '').split(',')[0].trim() || 'popular blockbusters';
-      // Search for normal 'song audio' rather than 'hit songs' to minimize getting jukeboxes
-      const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(cleanArtist + ' track audio')}`);
+
+      const titleLower = song.title.toLowerCase();
+      let moodQuery = "tamil hit songs";
+      if (titleLower.includes("kuthu") || titleLower.includes("dance") || titleLower.includes("mass")) {
+        moodQuery = "tamil kuthu dance songs";
+      } else if (titleLower.includes("love") || titleLower.includes("kadhal") || titleLower.includes("melody")) {
+        moodQuery = "tamil melody love songs";
+      } else if (titleLower.includes("sad") || titleLower.includes("sogam") || titleLower.includes("pain")) {
+        moodQuery = "tamil sad songs";
+      } else {
+        // Default to a mix of similar vibe from that decade implicitly by adding "tamil songs" 
+        moodQuery = `${song.title.split(' ').slice(0, 2).join(' ')} similar tamil songs`;
+      }
+
+      const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(moodQuery)}`);
       const data = await res.json();
 
       const firstWord = song.title.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, "");
