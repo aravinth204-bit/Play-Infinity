@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #ff8a8a;
+  --color-brand-light: #ffdada;
+  --color-brand-dark: #cc5c5c;
+}
+
+@layer base {
+  body {
+    @apply bg-gradient-to-br from-[#ffdada] to-[#e6e6e6] text-[#333] font-sans antialiased min-h-screen m-0 select-none;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+/* Custom styles mapping the design */
+.player-container {
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.song-item-hover:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Micro animations */
+.pulse-subtle {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: .7;
+  }
+}
+
+/* Hide scrollbar for clean UI */
+::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+  /* make scrollbar invisible */
+}
