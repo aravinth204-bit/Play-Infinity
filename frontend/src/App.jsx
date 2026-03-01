@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import ReactPlayer from 'react-player';
 import { Home, Music, Search, User, Play, Pause, SkipBack, SkipForward, Heart, MoreHorizontal, ArrowLeft, Shuffle, Repeat, Upload } from 'lucide-react';
 import { formatTime } from './utils';
@@ -140,8 +140,49 @@ export default function App() {
     }
   };
 
+  // Mobile Background Playback & MediaSession API Workaround
+  const silentAudioRef = useRef(null);
+
+  useEffect(() => {
+    if ('mediaSession' in navigator && currentSong) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentSong.title,
+        artist: currentSong.artist || 'Unknown Artist',
+        album: 'My Music App',
+        artwork: [
+          { src: currentSong.thumbnail, sizes: '96x96', type: 'image/jpeg' },
+          { src: currentSong.thumbnail, sizes: '128x128', type: 'image/jpeg' },
+          { src: currentSong.thumbnail, sizes: '256x256', type: 'image/jpeg' },
+          { src: currentSong.thumbnail, sizes: '512x512', type: 'image/jpeg' },
+        ]
+      });
+
+      navigator.mediaSession.setActionHandler('play', () => {
+        setIsPlaying(true);
+        silentAudioRef.current?.play();
+      });
+      navigator.mediaSession.setActionHandler('pause', () => {
+        setIsPlaying(false);
+        silentAudioRef.current?.pause();
+      });
+      navigator.mediaSession.setActionHandler('previoustrack', playPrev);
+      navigator.mediaSession.setActionHandler('nexttrack', playNext);
+    }
+  }, [currentSong]);
+
+  useEffect(() => {
+    if (isPlaying && silentAudioRef.current) {
+      silentAudioRef.current.play().catch(e => console.log('Silent audio play error:', e));
+    } else if (!isPlaying && silentAudioRef.current) {
+      silentAudioRef.current.pause();
+    }
+  }, [isPlaying]);
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-900 overflow-hidden font-['Outfit']">
+
+      {/* Invisible HTML5 Audio to keep browser session alive for iOS/Android Background playing */}
+      <audio ref={silentAudioRef} loop src="data:audio/mp3;base64,//OwgAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAAFAAAH8AACBwYICQoLDA0ODxAREhMUFRYXGBkZGhscHR4fICEiIyQlJicpKSorLC0uLzAxMjM0NTY3ODk5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlbW1xdXl9gYWJjZGVmZ2hpamtc" />
 
       {/* Invisible YouTube Player */}
       {currentSong && (
@@ -158,7 +199,11 @@ export default function App() {
             height="50px"
             config={{
               youtube: {
-                playerVars: { autoplay: 1 }
+                playerVars: {
+                  autoplay: 1,
+                  playsinline: 1, // Essential for iOS background
+                  origin: window.location.origin
+                }
               }
             }}
           />
