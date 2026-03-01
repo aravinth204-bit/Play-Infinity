@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import ReactPlayer from 'react-player';
+import ReactPlayer from 'react-player/youtube';
 import { Home, Music, Search, User, Play, Pause, SkipBack, SkipForward, Heart, MoreHorizontal, ArrowLeft, Shuffle, Repeat, Upload } from 'lucide-react';
 import { formatTime } from './utils';
 
@@ -80,24 +80,26 @@ export default function App() {
     <div className="flex items-center justify-center min-h-screen bg-gray-900 overflow-hidden font-['Outfit']">
 
       {/* Invisible YouTube Player */}
-      <div className="absolute top-[-9999px] left-[-9999px] w-[50px] h-[50px] opacity-0 pointer-events-none overflow-hidden">
-        <ReactPlayer
-          ref={playerRef}
-          url={currentSong ? currentSong.url : "https://www.youtube.com/watch?v=pzlEJY1CwCk"}
-          playing={isPlaying}
-          onProgress={handleProgress}
-          onDuration={handleDuration}
-          onEnded={playNext}
-          volume={1}
-          width="50px"
-          height="50px"
-          config={{
-            youtube: {
-              playerVars: { autoplay: 1 }
-            }
-          }}
-        />
-      </div>
+      {currentSong && (
+        <div className="absolute top-[-9999px] left-[-9999px] w-[50px] h-[50px] opacity-0 pointer-events-none overflow-hidden">
+          <ReactPlayer
+            ref={playerRef}
+            url={currentSong.url}
+            playing={isPlaying}
+            onProgress={handleProgress}
+            onDuration={handleDuration}
+            onEnded={playNext}
+            volume={1}
+            width="50px"
+            height="50px"
+            config={{
+              youtube: {
+                playerVars: { autoplay: 1 }
+              }
+            }}
+          />
+        </div>
+      )}
 
       {/* App Container - Mobile Layout */}
       <div className="w-[375px] h-[812px] bg-gradient-to-b from-[#ffcfd7] to-[#fcfcfc] rounded-[40px] shadow-2xl relative overflow-hidden flex flex-col transform scale-95 md:scale-100">
