@@ -81,7 +81,7 @@ export default function App() {
 
       {/* Invisible YouTube Player */}
       {currentSong && (
-        <div style={{ display: 'none' }}>
+        <div className="absolute top-[-9999px] left-[-9999px] w-[50px] h-[50px] opacity-0 pointer-events-none overflow-hidden">
           <ReactPlayer
             ref={playerRef}
             url={currentSong.url}
@@ -90,7 +90,13 @@ export default function App() {
             onDuration={handleDuration}
             onEnded={playNext}
             volume={1}
-            controls={false}
+            width="50px"
+            height="50px"
+            config={{
+              youtube: {
+                playerVars: { autoplay: 1 }
+              }
+            }}
           />
         </div>
       )}
