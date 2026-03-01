@@ -335,8 +335,8 @@ export default function App() {
                   </div>
 
                   {/* Up Next Mini preview */}
-                  <div className="mt-8 w-full w-full">
-                    <div className="flex items-center justify-between bg-white/40 p-3 rounded-2xl shadow-sm backdrop-blur-md text-sm text-gray-800 font-bold mb-3 z-10 relative">
+                  <div className="mt-8 w-full flex-1 flex flex-col min-h-[50px]">
+                    <div className="flex items-center justify-between bg-white/40 p-3 rounded-2xl shadow-sm backdrop-blur-md text-sm text-gray-800 font-bold mb-3 z-10 relative shrink-0">
                       <span className="flex items-center gap-2">
                         <Upload size={16} className="rotate-90 text-[#ff9eb1]" /> Up Next
                       </span>
@@ -344,12 +344,12 @@ export default function App() {
                     </div>
 
                     {queue.length > 0 ? (
-                      <div className="space-y-3 pb-8 relative z-10">
+                      <div className="space-y-3 pb-8 relative z-10 overflow-y-auto no-scrollbar flex-1 max-h-[180px]">
                         {queue.map(song => (
                           <div
                             key={song.id}
                             onClick={() => playSong(song, true)}
-                            className="flex items-center gap-3 bg-white/20 hover:bg-white/40 p-2 rounded-xl cursor-pointer transition-all border border-white/20"
+                            className="flex items-center gap-3 bg-white/20 hover:bg-white/40 p-2 rounded-xl cursor-pointer transition-all border border-white/20 shrink-0"
                           >
                             <img src={song.thumbnail} alt={song.title} className="w-10 h-10 rounded-lg object-cover shadow-sm min-w-[40px]" />
                             <div className="flex-1 overflow-hidden">
@@ -361,7 +361,7 @@ export default function App() {
                         ))}
                       </div>
                     ) : (
-                      !isFetchingQueue && <p className="text-xs text-center text-gray-400 pb-8 mt-2">End of queue</p>
+                      !isFetchingQueue && <p className="text-xs text-center text-gray-400 pb-8 mt-2 shrink-0">End of queue</p>
                     )}
                   </div>
 
