@@ -276,7 +276,7 @@ export default function App() {
               </div>
 
               {currentSong ? (
-                <div className="flex-1 d-flex flex-col items-center px-8 relative">
+                <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col items-center px-8 relative">
 
                   {/* Album Art with pulsing effect when playing */}
                   <div className={`mt-4 w-full aspect-square rounded-[36px] overflow-hidden shadow-[0_20px_40px_rgba(255,158,177,0.3)] transition-transform duration-500 ${isPlaying ? 'scale-100' : 'scale-95'}`}>
