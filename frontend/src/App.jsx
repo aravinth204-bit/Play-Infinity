@@ -40,23 +40,22 @@ export default function App() {
       const apiEndpoint = import.meta.env.DEV ? `/api/search` : `/.netlify/functions/search`;
 
       const titleLower = song.title.toLowerCase();
-      let moodQuery = "tamil hit songs";
+      let moodQuery = "tamil song";
       if (titleLower.includes("kuthu") || titleLower.includes("dance") || titleLower.includes("mass")) {
-        moodQuery = "tamil kuthu dance songs";
+        moodQuery = "kuthu tamil song audio";
       } else if (titleLower.includes("love") || titleLower.includes("kadhal") || titleLower.includes("melody")) {
-        moodQuery = "tamil melody love songs";
+        moodQuery = "melody tamil love song lyric";
       } else if (titleLower.includes("sad") || titleLower.includes("sogam") || titleLower.includes("pain")) {
-        moodQuery = "tamil sad songs";
+        moodQuery = "sad tamil song audio";
       } else {
-        // Default to a mix of similar vibe from that decade implicitly by adding "tamil songs" 
-        moodQuery = `${song.title.split(' ').slice(0, 2).join(' ')} similar tamil songs`;
+        moodQuery = `${song.title.split(' ').slice(0, 2).join(' ')} tamil song lyrical`;
       }
 
       const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(moodQuery)}`);
       const data = await res.json();
 
       const firstWord = song.title.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, "");
-      const badWords = ["hits", "hit", "jukebox", "vol", "volume", "mashup", "collection", "non stop", "nonstop", "bgm", "compilation"];
+      const badWords = ["hits", "hit", "jukebox", "vol", "volume", "mashup", "collection", "non stop", "nonstop", "bgm", "compilation", "news", "reply", "interview", "speech", "review", "reaction", "trailer", "teaser", "promo", "public"];
 
       const filteredQueue = data.filter(s => {
         if (s.id === song.id) return false;
@@ -263,7 +262,7 @@ export default function App() {
 
           {/* NOW PLAYING VIEW */}
           {activeTab === 'Music' && (
-            <div className="flex flex-col h-full">
+            <div className="flex flex-col min-h-full">
               {/* Header */}
               <div className="flex items-center justify-between p-6">
                 <button onClick={() => setActiveTab('Search')} className="p-2 hover:bg-black/5 rounded-full transition-colors">
@@ -276,7 +275,7 @@ export default function App() {
               </div>
 
               {currentSong ? (
-                <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col items-center px-8 relative">
+                <div className="flex-1 flex flex-col items-center px-8 relative pb-10">
 
                   {/* Album Art with pulsing effect when playing */}
                   <div className={`mt-4 w-full aspect-square rounded-[36px] overflow-hidden shadow-[0_20px_40px_rgba(255,158,177,0.3)] transition-transform duration-500 ${isPlaying ? 'scale-100' : 'scale-95'}`}>
