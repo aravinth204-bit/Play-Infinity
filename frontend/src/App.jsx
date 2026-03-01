@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import ReactPlayer from 'react-player';
+import ReactPlayer from 'react-player/youtube';
 import { Home, Music, Search, User, Play, Pause, SkipBack, SkipForward, Heart, MoreHorizontal, ArrowLeft, Shuffle, Repeat, Upload } from 'lucide-react';
 import { formatTime } from './utils';
 
