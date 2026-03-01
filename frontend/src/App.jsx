@@ -346,7 +346,7 @@ export default function App() {
 
                     {queue.length > 0 ? (
                       <div className="space-y-3 pb-8 relative z-10">
-                        {queue.slice(0, 3).map(song => (
+                        {queue.map(song => (
                           <div
                             key={song.id}
                             onClick={() => playSong(song, true)}
