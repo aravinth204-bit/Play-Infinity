@@ -52,3 +52,51 @@
   background: transparent;
   /* make scrollbar invisible */
 }
+
+@keyframes eq {
+  0% {
+    height: 15%;
+  }
+
+  50% {
+    height: 100%;
+  }
+
+  100% {
+    height: 15%;
+  }
+}
+
+@keyframes pop-heart {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.4);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes float-heart {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(var(--dx), var(--dy)) scale(0);
+    opacity: 0;
+  }
+}
+
+.animate-pop {
+  animation: pop-heart 0.3s ease-out;
+}
+
+.animate-float {
+  animation: float-heart 0.8s ease-out forwards;
+}
