@@ -13,7 +13,7 @@ exports.handler = async (event, context) => {
 
         // Append auto/music to get better song results
         const r = await ytSearch(query + " song audio");
-        const videos = r.videos.slice(0, 20).map(v => ({
+        const videos = r.videos.slice(0, 50).map(v => ({
             id: v.videoId,
             title: v.title,
             artist: v.author.name,

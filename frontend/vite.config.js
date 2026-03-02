@@ -21,7 +21,7 @@ export default defineConfig({
           }
           try {
             const r = await ytSearch(q + ' music audio');
-            const videos = r.videos.slice(0, 20).map(v => ({
+            const videos = r.videos.slice(0, 50).map(v => ({
               id: v.videoId,
               title: v.title,
               artist: v.author.name,
