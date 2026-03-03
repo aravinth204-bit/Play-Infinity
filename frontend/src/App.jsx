@@ -620,11 +620,9 @@ export default function App() {
 
   useEffect(() => {
     if (silentAudioRef.current) {
-      if (isPlaying) {
-        silentAudioRef.current.play().catch(e => console.log('Silent audio play error:', e));
-      } else {
-        silentAudioRef.current.pause();
-      }
+      // We NEVER pause the silent audio! 
+      // If we pause it, Android Chrome instantly releases AudioFocus and destroys the Notification Bar.
+      silentAudioRef.current.play().catch(e => console.log('Silent audio play error:', e));
     }
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
