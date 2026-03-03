@@ -484,16 +484,43 @@ export default function App() {
     }
   };
 
-  const playSong = (song, fromQueue = false) => {
+  const streamEndpointBase = '/api/stream';
+
+  // List of public Piped instances as backbridge for background play
+  const pipedInstances = [
+    'https://pipedapi.kavin.rocks',
+    'https://api.piped.victr.me',
+    'https://piped-api.lunar.icu',
+    'https://api.piped.projectsegfau.lt'
+  ];
+
+  const fetchPipedStream = async (videoId) => {
+    for (const instance of pipedInstances) {
+      try {
+        const response = await fetch(`${instance}/streams/${videoId}`);
+        if (!response.ok) continue;
+        const data = await response.json();
+        // Return the first audio-only stream or best available
+        const audioStream = data.audioStreams?.find(s => s.mimeType.includes('audio/mp4')) || data.audioStreams?.[0];
+        if (audioStream?.url) return audioStream.url;
+      } catch (e) {
+        console.warn(`Piped instance ${instance} failed:`, e);
+      }
+    }
+    return null;
+  };
+  const playSong = async (song, fromQueue = false) => {
     setCurrentSong(song);
     setIsPlaying(true);
     setActiveTab('Music');
+    setUseIframeFallback(false);
+
     sessionPlayedIds.current.add(song.id);
     addPlayedTitleTokens(song.title);
 
     setSearchHistory(prev => {
       const filtered = prev.filter(s => s.id !== song.id);
-      return [song, ...filtered].slice(0, 20); // Keep last 20 songs
+      return [song, ...filtered].slice(0, 20);
     });
 
     if (!fromQueue) {
@@ -504,6 +531,13 @@ export default function App() {
       if (queue.length <= 15) {
         fetchQueue(song);
       }
+    }
+
+    const directUrl = await fetchPipedStream(song.id);
+    if (directUrl) {
+      setDirectStreamUrl(directUrl);
+    } else {
+      setDirectStreamUrl(null);
     }
   };
 
@@ -531,22 +565,13 @@ export default function App() {
     if (queue.length > 0) {
       playSong(queue[0], true);
     } else if (isFetchingQueue) {
-      // Don't fall back to search results if queue is still loading
       return;
     } else if (fallbackSongs.length > 0) {
-      const unplayedFallback = fallbackSongs.filter(s => {
-        if (sessionPlayedIds.current.has(s.id)) return false;
-        if (currentSong && isLikelySameSong(s.title, currentSong.title)) return false;
-        const tokens = titleTokenSet(s.title);
-        return !playedTitleTokenSetsRef.current.some(existing => tokenSimilarity(existing, tokens) >= 0.66);
-      });
-      const source = unplayedFallback.length > 0 ? unplayedFallback : fallbackSongs;
-
-      const idx = source.findIndex(s => s.id === currentSong?.id);
-      if (idx !== -1 && idx < source.length - 1) {
-        playSong(source[idx + 1]);
+      const idx = fallbackSongs.findIndex(s => s.id === currentSong?.id);
+      if (idx !== -1 && idx < fallbackSongs.length - 1) {
+        playSong(fallbackSongs[idx + 1]);
       } else {
-        playSong(source[0]); // loop back
+        playSong(fallbackSongs[0]); // loop back
       }
     }
   };
@@ -561,7 +586,10 @@ export default function App() {
     }
   };
 
-  // Mobile Background Playback & MediaSession API Workaround
+  const [directStreamUrl, setDirectStreamUrl] = useState(null);
+  const currentStreamUrl = directStreamUrl || (currentSong ? `${streamEndpointBase}?videoId=${currentSong.id}` : '');
+
+  // Mobile Background Playback & MediaSession API Logic
   const silentAudioRef = useRef(null);
   const playNextRef = useRef(playNext);
   const playPrevRef = useRef(playPrev);
@@ -589,7 +617,7 @@ export default function App() {
         if (internalPlayer?.playVideo) internalPlayer.playVideo();
         if (internalPlayer?.play) internalPlayer.play().catch(() => { });
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
-        silentAudioRef.current?.play().catch(e => console.log('Silent audio resume error:', e));
+        silentAudioRef.current?.play().catch(() => { });
       });
       navigator.mediaSession.setActionHandler('pause', () => {
         setIsPlaying(false);
@@ -597,7 +625,7 @@ export default function App() {
         if (internalPlayer?.pauseVideo) internalPlayer.pauseVideo();
         if (internalPlayer?.pause) internalPlayer.pause();
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
-        silentAudioRef.current?.pause(); // Pause silent audio to allow Android to show 'Paused' state
+        silentAudioRef.current?.pause();
       });
       navigator.mediaSession.setActionHandler('previoustrack', () => {
         if (playPrevRef.current) playPrevRef.current();
@@ -617,9 +645,7 @@ export default function App() {
             playerRef.current.seekTo(playerRef.current.getCurrentTime() + 10, "seconds");
           }
         });
-      } catch {
-        // Seek actions not supported in this browser version.
-      }
+      } catch { }
     }
   }, [currentSong]);
 
@@ -631,7 +657,7 @@ export default function App() {
   useEffect(() => {
     if (silentAudioRef.current) {
       if (isPlaying) {
-        silentAudioRef.current.play().catch(e => console.log('Silent audio play error:', e));
+        silentAudioRef.current.play().catch(() => { });
       } else {
         silentAudioRef.current.pause();
       }
@@ -649,16 +675,8 @@ export default function App() {
         playbackRate: 1,
         position: Math.min(progress, duration)
       });
-    } catch {
-      // setPositionState is not fully supported on all devices.
-    }
+    } catch { }
   }, [progress, duration, currentSong]);
-
-  const displaySongs = fallbackSongs;
-  const hasActiveSearchResults = searchQuery.trim().length > 0 && songs.length > 0;
-  const shouldShowQueue = Boolean(currentSong) && !hasActiveSearchResults;
-  const streamEndpointBase = '/api/stream';
-  const currentStreamUrl = currentSong ? `${streamEndpointBase}?videoId=${currentSong.id}` : '';
 
   return (
     <div className="flex items-center justify-center bg-gray-900 overflow-hidden font-['Outfit']" style={{ height: '100dvh' }}>
@@ -690,12 +708,16 @@ export default function App() {
             height="50px"
             config={{
               file: {
-                forceAudio: true, // Force native audio rendering for the proxy stream
+                forceAudio: true,
+                attributes: {
+                  playsInline: true,
+                  webkitPlaysInline: true
+                }
               },
               youtube: {
                 playerVars: {
                   autoplay: 1,
-                  playsinline: 1, // Essential for iOS background
+                  playsinline: 1,
                   origin: window.location.origin
                 }
               }
