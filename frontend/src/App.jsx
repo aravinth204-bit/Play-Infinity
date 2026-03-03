@@ -280,7 +280,7 @@ export default function App() {
     if (!searchQuery.trim()) return;
     setLoading(true);
     try {
-      // Fetch from our local dev proxy or netlify function
+      // Fetch from local dev proxy or Vercel serverless function
       const apiEndpoint = `/api/search`;
       const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(searchQuery)}`);
       const data = await res.json();
@@ -656,7 +656,7 @@ export default function App() {
   const displaySongs = fallbackSongs;
   const hasActiveSearchResults = searchQuery.trim().length > 0 && songs.length > 0;
   const shouldShowQueue = Boolean(currentSong) && !hasActiveSearchResults;
-  const streamEndpointBase = import.meta.env.DEV ? '/api/stream' : '/.netlify/functions/stream';
+  const streamEndpointBase = '/api/stream';
   const currentStreamUrl = currentSong ? `${streamEndpointBase}?videoId=${currentSong.id}` : '';
 
   return (
