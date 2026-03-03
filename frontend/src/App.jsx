@@ -73,6 +73,10 @@ const DesktopSongRow = React.memo(function DesktopSongRow({
 });
 
 export default function App() {
+  useEffect(() => {
+    alert("PLAY INFINITY - NEW VERSION 1.0.2 DETECTED!");
+  }, []);
+
   const [activeTab, setActiveTab] = useState('Home');
   const [currentSong, setCurrentSong] = useState(null);
   const [useIframeFallback, setUseIframeFallback] = useState(false);
