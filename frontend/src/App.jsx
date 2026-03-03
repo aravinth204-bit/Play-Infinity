@@ -278,6 +278,10 @@ export default function App() {
         sessionStorage.setItem('trendingSongs', JSON.stringify(shuffled));
       } catch (err) {
         console.error("Fetch trending error:", err);
+        // Show error for debugging in development/APK
+        if (window.location.protocol.startsWith('http')) {
+          console.log("Trending failed:", err.message);
+        }
       }
     };
     fetchTrending();
@@ -303,7 +307,7 @@ export default function App() {
       setSongs(results);
     } catch (err) {
       console.error(err);
-      alert("Failed to search. Please try again later.");
+      alert("Search Error: " + err.message + "\nEndpoint: " + apiEndpoint);
     } finally {
       setLoading(false);
     }
