@@ -1,0 +1,22 @@
+{
+    "name": "Play Infinity Music",
+    "short_name": "Play Infinity",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#121422",
+    "theme_color": "#8cd92b",
+    "description": "Listen to your favorite music anywhere",
+    "icons": [
+        {
+            "src": "logo.jpg",
+            "sizes": "192x192",
+            "type": "image/jpeg",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "logo.jpg",
+            "sizes": "512x512",
+            "type": "image/jpeg"
+        }
+    ]
+}
