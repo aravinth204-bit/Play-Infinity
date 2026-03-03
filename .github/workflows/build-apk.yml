@@ -26,6 +26,11 @@ jobs:
           cd frontend
           npm run build
 
+      - name: Capacitor Sync
+        run: |
+          cd frontend
+          npx cap sync android
+
       - name: Build APK
         run: |
           cd frontend/android
