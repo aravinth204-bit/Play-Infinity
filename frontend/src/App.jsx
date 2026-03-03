@@ -45,6 +45,14 @@ const AnimatedHeart = ({ isFavorite, onClick, className = '', size = 16 }) => {
   );
 };
 
+// Global audio element for background play
+const backgroundAudio = typeof window !== 'undefined' ? new Audio() : null;
+if (backgroundAudio) {
+  backgroundAudio.id = "play-infinity-core-audio";
+  backgroundAudio.style.display = 'none';
+  backgroundAudio.setAttribute('playsinline', 'true');
+}
+
 const DesktopSongRow = React.memo(function DesktopSongRow({
   song,
   index,
@@ -714,6 +722,34 @@ export default function App() {
   const hasActiveSearchResults = searchQuery.trim().length > 0 && songs.length > 0;
   const shouldShowQueue = Boolean(currentSong) && !hasActiveSearchResults;
 
+  useEffect(() => {
+    if (backgroundAudio) {
+      backgroundAudio.onended = () => playNext();
+      backgroundAudio.ontimeupdate = () => setProgress(backgroundAudio.currentTime);
+      backgroundAudio.onloadeddata = () => setDuration(backgroundAudio.duration);
+      backgroundAudio.onerror = (e) => {
+        console.error("Audio player error:", e);
+        if (!useIframeFallback) setUseIframeFallback(true);
+      };
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!backgroundAudio) return;
+    if (isPlaying && !useIframeFallback) {
+      backgroundAudio.play().catch(e => console.error("Play failed", e));
+    } else {
+      backgroundAudio.pause();
+    }
+  }, [isPlaying, useIframeFallback]);
+
+  useEffect(() => {
+    if (backgroundAudio && currentStreamUrl && !useIframeFallback) {
+      backgroundAudio.src = currentStreamUrl;
+      if (isPlaying) backgroundAudio.play().catch(e => console.error("URL change play failed", e));
+    }
+  }, [currentStreamUrl, useIframeFallback]);
+
   return (
     <div className="flex items-center justify-center bg-gray-900 overflow-hidden font-['Outfit']" style={{ height: '100dvh' }}>
 
@@ -723,50 +759,25 @@ export default function App() {
       {/* Native Audio Proxy & YouTube Player Fallback */}
       {currentSong && (
         <div className="absolute top-[-9999px] left-[-9999px] w-[50px] h-[50px] opacity-0 pointer-events-none overflow-hidden">
-          <ReactPlayer
-            ref={playerRef}
-            url={useIframeFallback ? currentSong.url : currentStreamUrl}
-            playing={isPlaying}
-            onProgress={handleProgress}
-            onDuration={handleDuration}
-            onEnded={() => playNextRef.current()}
-            onError={(e) => {
-              console.error("Playback error:", e);
-              // If we are in the background, don't switch to iframe which fails backgrounding
-              if (document.visibilityState === 'visible') {
-                if (!useIframeFallback) {
-                  console.log("Audio proxy failed! Falling back to YouTube iframe...", e);
-                  setUseIframeFallback(true);
-                } else {
-                  playNextRef.current();
-                }
-              } else {
-                // In background, just try next song if this one fails
-                playNextRef.current();
-              }
-            }}
-            onPlay={setupMediaSession}
-            volume={1}
-            width="50px"
-            height="50px"
-            config={{
-              file: {
-                forceAudio: true,
-                attributes: {
-                  playsInline: true,
-                  webkitPlaysInline: true,
-                  crossOrigin: "anonymous"
-                }
-              },
-              youtube: {
-                playerVars: {
-                  autoplay: 1,
-                  playsinline: 1,
-                  origin: window.location.origin
-                }
-              }
-            }}
-          />
+          {useIframeFallback ? (
+            <ReactPlayer
+              ref={playerRef}
+              url={currentSong.url}
+              playing={isPlaying}
+              onProgress={handleProgress}
+              onDuration={handleDuration}
+              onEnded={() => playNext()}
+              onError={(e) => {
+                console.error("Iframe error:", e);
+                playNext();
+              }}
+              volume={1}
+              width="50px"
+              height="50px"
+            />
+          ) : (
+            <div className="bg-green-500 w-10 h-10">CORE MODE</div>
+          )}
         </div>
       )}
 
