@@ -74,6 +74,7 @@ const DesktopSongRow = React.memo(function DesktopSongRow({
 export default function App() {
   const [activeTab, setActiveTab] = useState('Home');
   const [currentSong, setCurrentSong] = useState(null);
+  const [useIframeFallback, setUseIframeFallback] = useState(false);
   const [songs, setSongs] = useState([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -615,6 +616,7 @@ export default function App() {
   };
 
   useEffect(() => {
+    setUseIframeFallback(false);
     setupMediaSession();
   }, [currentSong]);
 
