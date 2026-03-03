@@ -571,7 +571,6 @@ export default function App() {
 
   const setupMediaSession = useCallback(() => {
     if ('mediaSession' in navigator && currentSong) {
-      const internalPlayer = playerRef.current?.getInternalPlayer?.();
       navigator.mediaSession.metadata = new MediaMetadata({
         title: currentSong.title,
         artist: currentSong.artist || 'Unknown Artist',
@@ -586,6 +585,7 @@ export default function App() {
 
       navigator.mediaSession.setActionHandler('play', () => {
         setIsPlaying(true);
+        const internalPlayer = playerRef.current?.getInternalPlayer?.();
         if (internalPlayer?.playVideo) internalPlayer.playVideo();
         if (internalPlayer?.play) internalPlayer.play().catch(() => { });
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
@@ -593,6 +593,7 @@ export default function App() {
       });
       navigator.mediaSession.setActionHandler('pause', () => {
         setIsPlaying(false);
+        const internalPlayer = playerRef.current?.getInternalPlayer?.();
         if (internalPlayer?.pauseVideo) internalPlayer.pauseVideo();
         if (internalPlayer?.pause) internalPlayer.pause();
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
