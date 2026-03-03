@@ -650,10 +650,7 @@ export default function App() {
             onDuration={handleDuration}
             onEnded={() => playNextRef.current()}
             onError={() => playNextRef.current()}
-            onPlay={() => {
-              setIsPlaying(true);
-              setupMediaSession();
-            }}
+            onPlay={setupMediaSession}
             volume={1}
             width="50px"
             height="50px"
