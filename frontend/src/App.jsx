@@ -678,8 +678,6 @@ export default function App() {
     } catch { }
   }, [progress, duration, currentSong]);
 
-  const favoriteIds = useMemo(() => new Set(favorites.map(f => f.id)), [favorites]);
-  const fallbackSongs = songs.length > 0 ? songs : trendingSongs;
   const displaySongs = fallbackSongs;
   const hasActiveSearchResults = searchQuery.trim().length > 0 && songs.length > 0;
   const shouldShowQueue = Boolean(currentSong) && !hasActiveSearchResults;
