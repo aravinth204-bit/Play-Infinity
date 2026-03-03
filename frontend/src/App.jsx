@@ -176,7 +176,8 @@ export default function App() {
         const apiEndpoint = import.meta.env.DEV ? `/api/search` : `/.netlify/functions/search`;
         const res = await fetch(`${apiEndpoint}?q=tamil+latest+trending+hit+songs+video`);
         const data = await res.json();
-        const shuffled = data.sort(() => 0.5 - Math.random()).slice(0, 20);
+        const songsList = Array.isArray(data) ? data : (data.videos || []);
+        const shuffled = songsList.sort(() => 0.5 - Math.random()).slice(0, 20);
         setTrendingSongs(shuffled);
         sessionStorage.setItem('trendingSongs', JSON.stringify(shuffled));
       } catch (err) {
@@ -195,7 +196,7 @@ export default function App() {
       const apiEndpoint = import.meta.env.DEV ? `/api/search` : `/.netlify/functions/search`;
       const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(searchQuery)}`);
       const data = await res.json();
-      setSongs(data);
+      setSongs(Array.isArray(data) ? data : (data.videos || []));
     } catch (err) {
       console.error(err);
       alert("Failed to search. Please try again later.");
@@ -240,7 +241,10 @@ export default function App() {
       }
 
       const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(moodQuery)}`);
-      const data = await res.json();
+      let data = await res.json();
+      if (!Array.isArray(data)) {
+        data = data.videos || [];
+      }
 
       const getSignificantWords = (str) => {
         return str.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(' ')
@@ -429,7 +433,7 @@ export default function App() {
     : [...searchHistory, ...trendingSongs.filter(t => !searchHistory.some(h => h.id === t.id))].slice(0, 30);
 
   return (
-    <div className="flex items-center justify-center bg-gray-900 overflow-hidden font-['Outfit']" style={{ height: '100vh' }}>
+    <div className="flex items-center justify-center bg-gray-900 overflow-hidden font-['Outfit']" style={{ height: '100dvh' }}>
 
       {/* Invisible HTML5 Audio to keep browser session alive for iOS/Android Background playing */}
       <audio ref={silentAudioRef} loop src="data:audio/mp3;base64,//OwgAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAAFAAAH8AACBwYICQoLDA0ODxAREhMUFRYXGBkZGhscHR4fICEiIyQlJicpKSorLC0uLzAxMjM0NTY3ODk5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlbW1xdXl9gYWJjZGVmZ2hpamtc" />
@@ -444,6 +448,7 @@ export default function App() {
             onProgress={handleProgress}
             onDuration={handleDuration}
             onEnded={playNext}
+            onError={playNext}
             volume={1}
             width="50px"
             height="50px"
@@ -461,7 +466,7 @@ export default function App() {
       )}
 
       {/* App Container - Mobile Layout (Dark Theme) */}
-      <div className="w-[375px] h-[812px] bg-[#121422] rounded-[40px] shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden flex flex-col transform scale-95 md:hidden text-[#a0a3b1]">
+      <div className="w-full h-full max-w-[450px] bg-[#121422] shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden flex flex-col md:hidden text-[#a0a3b1] sm:rounded-none sm:scale-100">
 
 
 
@@ -745,7 +750,7 @@ export default function App() {
                 <div className="flex-1 flex flex-col items-center px-8 relative pb-10">
 
                   {/* Album Art Square Banner */}
-                  <div className={`mt-2 w-full aspect-square rounded-[40px] rounded-tl-[10px] rounded-br-[10px] overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.5)] transition-transform duration-500 ${isPlaying ? 'scale-100' : 'scale-95'}`}>
+                  <div className={`mt-2 w-[70vw] max-w-[260px] aspect-square rounded-[40px] rounded-tl-[10px] rounded-br-[10px] overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.5)] transition-transform duration-500 mx-auto ${isPlaying ? 'scale-100' : 'scale-95'}`}>
                     <img
                       src={currentSong.thumbnail}
                       alt="Cover"
@@ -830,8 +835,8 @@ export default function App() {
                           </div>
                         </div>
                       ))}
-                      {queue.length === 0 && !isFetchingQueue && (
-                        <p className="text-xs text-center text-gray-600 mt-2">End of queue</p>
+                      {!isFetchingQueue && (
+                        <p className="text-xs text-center text-gray-600 mt-2 mb-4">End of queue</p>
                       )}
                     </div>
                   </div>
