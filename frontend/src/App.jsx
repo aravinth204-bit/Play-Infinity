@@ -261,7 +261,7 @@ export default function App() {
           setTrendingSongs(JSON.parse(cached));
           return;
         }
-        const apiEndpoint = `/api/search`;
+        const apiEndpoint = `https://play-infinity.vercel.app/api/search`;
         // Strictly search for Tamil audio songs, avoiding jukebox/collections
         const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent('tamil latest hit songs audio -jukebox -collections -mashup -nonstop')}`);
         const data = await res.json();
@@ -289,7 +289,7 @@ export default function App() {
     setLoading(true);
     try {
       // Fetch from local dev proxy or Vercel serverless function
-      const apiEndpoint = `/api/search`;
+      const apiEndpoint = `https://play-infinity.vercel.app/api/search`;
       const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(searchQuery + ' tamil audio song -jukebox')}`);
       const data = await res.json();
       let results = Array.isArray(data) ? data : (data.videos || []);
@@ -313,7 +313,7 @@ export default function App() {
     setIsFetchingQueue(true);
     try {
       const minQueueTarget = 20;
-      const apiEndpoint = `/api/search`;
+      const apiEndpoint = `https://play-infinity.vercel.app/api/search`;
       const currentSongTitle = song.title || '';
 
       const titleLower = song.title.toLowerCase();
@@ -500,7 +500,7 @@ export default function App() {
     }
   };
 
-  const streamEndpointBase = '/api/stream';
+  const streamEndpointBase = 'https://play-infinity.vercel.app/api/stream';
 
   // List of public Piped instances as backbridge for background play
   const pipedInstances = [
