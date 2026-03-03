@@ -639,22 +639,32 @@ export default function App() {
       {/* Invisible HTML5 Audio to keep browser session alive for iOS/Android Background playing */}
       <audio ref={silentAudioRef} loop playsInline src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=" />
 
-      {/* Invisible YouTube Player */}
+      {/* Native Audio Proxy & YouTube Player Fallback */}
       {currentSong && (
         <div className="absolute top-[-9999px] left-[-9999px] w-[50px] h-[50px] opacity-0 pointer-events-none overflow-hidden">
           <ReactPlayer
             ref={playerRef}
-            url={currentSong.url}
+            url={useIframeFallback ? currentSong.url : `/api/stream?videoId=${currentSong.id}`}
             playing={isPlaying}
             onProgress={handleProgress}
             onDuration={handleDuration}
             onEnded={() => playNextRef.current()}
-            onError={() => playNextRef.current()}
+            onError={(e) => {
+              if (!useIframeFallback) {
+                console.log("Audio proxy failed! Falling back to YouTube iframe...", e);
+                setUseIframeFallback(true);
+              } else {
+                playNextRef.current();
+              }
+            }}
             onPlay={setupMediaSession}
             volume={1}
             width="50px"
             height="50px"
             config={{
+              file: {
+                forceAudio: true, // Force native audio rendering for the proxy stream
+              },
               youtube: {
                 playerVars: {
                   autoplay: 1,

@@ -20,6 +20,7 @@ export default defineConfig({
             return;
           }
           try {
+            res.setHeader('Access-Control-Allow-Origin', '*');
             const r = await ytSearch(q + ' music audio');
             const videos = r.videos.slice(0, 50).map(v => ({
               id: v.videoId,
@@ -35,6 +36,36 @@ export default defineConfig({
           } catch (e) {
             res.statusCode = 500;
             res.end(JSON.stringify({ error: e.message }));
+          }
+        });
+
+        server.middlewares.use('/api/stream', async (req, res) => {
+          const url = new URL(req.url, 'http://localhost');
+          const videoId = url.searchParams.get('videoId');
+          if (!videoId) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'Missing videoId' }));
+            return;
+          }
+
+          try {
+            const ytdl = require('@distube/ytdl-core');
+            const info = await ytdl.getInfo(videoId);
+            const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' });
+
+            if (format && format.url) {
+              res.setHeader('Access-Control-Allow-Origin', '*');
+              res.statusCode = 302;
+              res.setHeader('Location', format.url);
+              res.end();
+            } else {
+              res.statusCode = 404;
+              res.end(JSON.stringify({ error: 'No audio format found' }));
+            }
+          } catch (error) {
+            console.error('YTDL Stream Fetch Error:', error.message);
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: 'Failed to fetch audio stream' }));
           }
         });
       }
