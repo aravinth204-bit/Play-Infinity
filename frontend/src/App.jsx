@@ -585,11 +585,12 @@ export default function App() {
       navigator.mediaSession.setActionHandler('play', () => {
         setIsPlaying(true);
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
-        silentAudioRef.current?.play().catch(e => console.log(e));
+        silentAudioRef.current?.play().catch(e => console.log('Silent audio resume error:', e));
       });
       navigator.mediaSession.setActionHandler('pause', () => {
         setIsPlaying(false);
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+        silentAudioRef.current?.pause(); // Pause silent audio to allow Android to show 'Paused' state
       });
       navigator.mediaSession.setActionHandler('previoustrack', () => {
         if (playPrevRef.current) playPrevRef.current();
@@ -622,9 +623,11 @@ export default function App() {
 
   useEffect(() => {
     if (silentAudioRef.current) {
-      // We NEVER pause the silent audio! 
-      // If we pause it, Android Chrome instantly releases AudioFocus and destroys the Notification Bar.
-      silentAudioRef.current.play().catch(e => console.log('Silent audio play error:', e));
+      if (isPlaying) {
+        silentAudioRef.current.play().catch(e => console.log('Silent audio play error:', e));
+      } else {
+        silentAudioRef.current.pause();
+      }
     }
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
