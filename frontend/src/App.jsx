@@ -583,11 +583,12 @@ export default function App() {
 
       navigator.mediaSession.setActionHandler('play', () => {
         setIsPlaying(true);
+        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
         silentAudioRef.current?.play().catch(e => console.log(e));
       });
       navigator.mediaSession.setActionHandler('pause', () => {
         setIsPlaying(false);
-        silentAudioRef.current?.pause();
+        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
       });
       navigator.mediaSession.setActionHandler('previoustrack', () => {
         if (playPrevRef.current) playPrevRef.current();
@@ -618,10 +619,11 @@ export default function App() {
   }, [currentSong]);
 
   useEffect(() => {
-    if (isPlaying && silentAudioRef.current) {
+    if (silentAudioRef.current) {
       silentAudioRef.current.play().catch(e => console.log('Silent audio play error:', e));
-    } else if (!isPlaying && silentAudioRef.current) {
-      silentAudioRef.current.pause();
+    }
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
     }
   }, [isPlaying]);
 
@@ -646,7 +648,11 @@ export default function App() {
             onDuration={handleDuration}
             onEnded={() => playNextRef.current()}
             onError={() => playNextRef.current()}
-            onPlay={() => setupMediaSession()}
+            onPlay={() => {
+              setIsPlaying(true);
+              setupMediaSession();
+            }}
+            onPause={() => setIsPlaying(false)}
             volume={1}
             width="50px"
             height="50px"
