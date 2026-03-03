@@ -620,7 +620,11 @@ export default function App() {
 
   useEffect(() => {
     if (silentAudioRef.current) {
-      silentAudioRef.current.play().catch(e => console.log('Silent audio play error:', e));
+      if (isPlaying) {
+        silentAudioRef.current.play().catch(e => console.log('Silent audio play error:', e));
+      } else {
+        silentAudioRef.current.pause();
+      }
     }
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
@@ -652,7 +656,6 @@ export default function App() {
               setIsPlaying(true);
               setupMediaSession();
             }}
-            onPause={() => setIsPlaying(false)}
             volume={1}
             width="50px"
             height="50px"
