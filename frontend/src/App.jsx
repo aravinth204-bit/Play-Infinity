@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 // Build ID: 2026-03-03-1655
 import ReactPlayer from 'react-player';
 import { Home, Music, Search, User, Play, Pause, SkipBack, SkipForward, Heart, MoreHorizontal, ArrowLeft, Shuffle, Repeat, Upload, List, Headphones, Book, Download, Clock, Settings, LogOut, Bell, ChevronRight, ChevronUp, Plus, X, FolderPlus, Mic2 } from 'lucide-react';
@@ -569,8 +569,9 @@ export default function App() {
   playNextRef.current = playNext;
   playPrevRef.current = playPrev;
 
-  const setupMediaSession = () => {
+  const setupMediaSession = useCallback(() => {
     if ('mediaSession' in navigator && currentSong) {
+      const internalPlayer = playerRef.current?.getInternalPlayer?.();
       navigator.mediaSession.metadata = new MediaMetadata({
         title: currentSong.title,
         artist: currentSong.artist || 'Unknown Artist',
@@ -585,11 +586,15 @@ export default function App() {
 
       navigator.mediaSession.setActionHandler('play', () => {
         setIsPlaying(true);
+        if (internalPlayer?.playVideo) internalPlayer.playVideo();
+        if (internalPlayer?.play) internalPlayer.play().catch(() => { });
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
         silentAudioRef.current?.play().catch(e => console.log('Silent audio resume error:', e));
       });
       navigator.mediaSession.setActionHandler('pause', () => {
         setIsPlaying(false);
+        if (internalPlayer?.pauseVideo) internalPlayer.pauseVideo();
+        if (internalPlayer?.pause) internalPlayer.pause();
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
         silentAudioRef.current?.pause(); // Pause silent audio to allow Android to show 'Paused' state
       });
@@ -615,12 +620,12 @@ export default function App() {
         // Seek actions not supported in this browser version.
       }
     }
-  };
+  }, [currentSong]);
 
   useEffect(() => {
     setUseIframeFallback(false);
     setupMediaSession();
-  }, [currentSong]);
+  }, [currentSong, setupMediaSession]);
 
   useEffect(() => {
     if (silentAudioRef.current) {
@@ -635,9 +640,24 @@ export default function App() {
     }
   }, [isPlaying]);
 
+  useEffect(() => {
+    if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState || !currentSong || !duration) return;
+    try {
+      navigator.mediaSession.setPositionState({
+        duration,
+        playbackRate: 1,
+        position: Math.min(progress, duration)
+      });
+    } catch {
+      // setPositionState is not fully supported on all devices.
+    }
+  }, [progress, duration, currentSong]);
+
   const displaySongs = fallbackSongs;
   const hasActiveSearchResults = searchQuery.trim().length > 0 && songs.length > 0;
   const shouldShowQueue = Boolean(currentSong) && !hasActiveSearchResults;
+  const streamEndpointBase = import.meta.env.DEV ? '/api/stream' : '/.netlify/functions/stream';
+  const currentStreamUrl = currentSong ? `${streamEndpointBase}?videoId=${currentSong.id}` : '';
 
   return (
     <div className="flex items-center justify-center bg-gray-900 overflow-hidden font-['Outfit']" style={{ height: '100dvh' }}>
@@ -650,7 +670,7 @@ export default function App() {
         <div className="absolute top-[-9999px] left-[-9999px] w-[50px] h-[50px] opacity-0 pointer-events-none overflow-hidden">
           <ReactPlayer
             ref={playerRef}
-            url={useIframeFallback ? currentSong.url : `/api/stream?videoId=${currentSong.id}`}
+            url={useIframeFallback ? currentSong.url : currentStreamUrl}
             playing={isPlaying}
             onProgress={handleProgress}
             onDuration={handleDuration}
