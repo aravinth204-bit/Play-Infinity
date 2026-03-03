@@ -261,7 +261,7 @@ export default function App() {
           setTrendingSongs(JSON.parse(cached));
           return;
         }
-        const apiEndpoint = `https://play-infinity.vercel.app/api/search`;
+        const apiEndpoint = `https://my-music-player-iota.vercel.app/api/search`;
         // Strictly search for Tamil audio songs, avoiding jukebox/collections
         const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent('tamil latest hit songs audio -jukebox -collections -mashup -nonstop')}`);
         const data = await res.json();
@@ -293,7 +293,7 @@ export default function App() {
     setLoading(true);
     try {
       // Fetch from local dev proxy or Vercel serverless function
-      const apiEndpoint = `https://play-infinity.vercel.app/api/search`;
+      const apiEndpoint = `https://my-music-player-iota.vercel.app/api/search`;
       const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(searchQuery + ' tamil audio song -jukebox')}`);
       const data = await res.json();
       let results = Array.isArray(data) ? data : (data.videos || []);
@@ -307,7 +307,7 @@ export default function App() {
       setSongs(results);
     } catch (err) {
       console.error(err);
-      alert("Search Error: " + err.message + "\nEndpoint: " + apiEndpoint);
+      alert("NEW APP - Search Error: " + err.message + "\nLink: " + apiEndpoint);
     } finally {
       setLoading(false);
     }
@@ -317,7 +317,7 @@ export default function App() {
     setIsFetchingQueue(true);
     try {
       const minQueueTarget = 20;
-      const apiEndpoint = `https://play-infinity.vercel.app/api/search`;
+      const apiEndpoint = `https://my-music-player-iota.vercel.app/api/search`;
       const currentSongTitle = song.title || '';
 
       const titleLower = song.title.toLowerCase();
@@ -504,7 +504,7 @@ export default function App() {
     }
   };
 
-  const streamEndpointBase = 'https://play-infinity.vercel.app/api/stream';
+  const streamEndpointBase = 'https://my-music-player-iota.vercel.app/api/stream';
 
   // List of public Piped instances as backbridge for background play
   const pipedInstances = [
