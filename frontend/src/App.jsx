@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+// Build ID: 2026-03-03-1655
 import ReactPlayer from 'react-player';
 import { Home, Music, Search, User, Play, Pause, SkipBack, SkipForward, Heart, MoreHorizontal, ArrowLeft, Shuffle, Repeat, Upload, List, Headphones, Book, Download, Clock, Settings, LogOut, Bell, ChevronRight, ChevronUp, Plus, X, FolderPlus, Mic2 } from 'lucide-react';
 import { formatTime } from './utils';
@@ -1208,7 +1209,7 @@ export default function App() {
         <div className="w-64 bg-[#1a1c2a] flex flex-col pt-10 pb-8 px-8 border-r border-[#262837] shrink-0 z-10">
           <h1 className="text-2xl font-bold mb-10 text-white flex items-center gap-3">
             <img src="/logo.jpg" alt="Play Infinity" className="h-10 w-10 object-cover rounded-full" />
-            <span className="text-[#8cd92b] tracking-wider text-xl">Play Infinity</span>
+            <span className="text-[#8cd92b] tracking-wider text-xl">Play Infinity v2.2</span>
           </h1>
 
           <nav className="flex-1 space-y-5 overflow-y-auto no-scrollbar">
