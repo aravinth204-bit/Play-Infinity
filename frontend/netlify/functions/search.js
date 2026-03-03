@@ -1,6 +1,7 @@
+/* global require, exports */
 const ytSearch = require("yt-search");
 
-exports.handler = async (event, context) => {
+exports.handler = async (event) => {
     try {
         const query = event.queryStringParameters.q;
         if (!query) {

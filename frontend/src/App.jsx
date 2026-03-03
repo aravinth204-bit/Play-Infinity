@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import ReactPlayer from 'react-player';
 import { Home, Music, Search, User, Play, Pause, SkipBack, SkipForward, Heart, MoreHorizontal, ArrowLeft, Shuffle, Repeat, Upload, List, Headphones, Book, Download, Clock, Settings, LogOut, Bell, ChevronRight, ChevronUp, Plus, X, FolderPlus, Mic2 } from 'lucide-react';
 import { formatTime } from './utils';
@@ -44,6 +44,33 @@ const AnimatedHeart = ({ isFavorite, onClick, className = '', size = 16 }) => {
   );
 };
 
+const DesktopSongRow = React.memo(function DesktopSongRow({
+  song,
+  index,
+  onSelect,
+  isFavorite,
+  onToggleFavorite
+}) {
+  return (
+    <div
+      onClick={onSelect}
+      className="flex items-center gap-4 hover:bg-[#1a1c2a] p-3 rounded-2xl cursor-pointer transition-all border border-transparent hover:border-[#262837]"
+    >
+      {index != null && (
+        <span className="text-gray-500 font-bold text-sm w-6 text-center opacity-70">{String(index + 1).padStart(2, '0')}</span>
+      )}
+      <img src={song.thumbnail} alt={song.title} className="w-12 h-12 rounded-xl object-cover shadow-sm" />
+      <div className="flex-1 overflow-hidden pr-4">
+        <h4 className="font-semibold text-white text-sm truncate">{song.title}</h4>
+        <p className="text-xs text-gray-400 truncate mt-1">{song.artist}</p>
+      </div>
+      <div className="text-xs text-gray-500 w-12 text-right mr-4">{formatTime(song.durationSeconds)}</div>
+      <AnimatedHeart size={16} isFavorite={isFavorite} onClick={onToggleFavorite} />
+      <div className="text-gray-500 hover:text-white transition-colors ml-4 mr-2"><MoreHorizontal size={16} /></div>
+    </div>
+  );
+});
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('Home');
   const [currentSong, setCurrentSong] = useState(null);
@@ -57,6 +84,7 @@ export default function App() {
   const [isFetchingQueue, setIsFetchingQueue] = useState(false);
   const playerRef = useRef(null);
   const sessionPlayedIds = useRef(new Set());
+  const playedTitleTokenSetsRef = useRef([]);
   const [trendingSongs, setTrendingSongs] = useState([]);
 
   const [searchHistory, setSearchHistory] = useState(() => {
@@ -86,6 +114,64 @@ export default function App() {
   const [sleepMinutesLeft, setSleepMinutesLeft] = useState(0);
   const [showSleepModal, setShowSleepModal] = useState(false);
   const sleepTimerRef = useRef(null);
+
+  const normalizeTitleKey = (title = '') => {
+    const stopWords = new Set([
+      'official', 'video', 'audio', 'lyric', 'lyrics', 'song', 'songs', 'full', 'hd', '4k', 'version',
+      'sad', 'mix', 'remix', 'slowed', 'reverb', 'topic', 'movie', 'film', 'tamil', 'telugu', 'hindi',
+      'malayalam', 'kannada', 'jukebox', 'shorts'
+    ]);
+
+    return title
+      .toLowerCase()
+      .replace(/\[[^\]]*\]|\([^)]*\)/g, ' ')
+      .replace(/[^\p{L}\p{N} ]/gu, ' ')
+      .split(/\s+/)
+      .filter(word => word && word.length > 2 && !stopWords.has(word))
+      .join(' ');
+  };
+
+  const titleTokenSet = (title = '') => new Set(normalizeTitleKey(title).split(' ').filter(Boolean));
+
+  const tokenSimilarity = (aSet, bSet) => {
+    if (!aSet || !bSet || aSet.size === 0 || bSet.size === 0) return 0;
+    let overlap = 0;
+    for (const word of aSet) {
+      if (bSet.has(word)) overlap++;
+    }
+    return overlap / Math.min(aSet.size, bSet.size);
+  };
+
+  const isLikelySameSong = (candidateTitle = '', currentTitle = '') => {
+    const aWords = titleTokenSet(candidateTitle);
+    const bWords = titleTokenSet(currentTitle);
+    if (aWords.size === 0 || bWords.size === 0) return false;
+
+    let overlapCount = 0;
+    for (const w of aWords) {
+      if (bWords.has(w)) overlapCount++;
+    }
+
+    const similarity = tokenSimilarity(aWords, bWords);
+    return (overlapCount >= 2 && similarity >= 0.5) || similarity >= 0.75;
+  };
+
+  const addPlayedTitleTokens = (title = '') => {
+    const tokens = titleTokenSet(title);
+    if (tokens.size === 0) return;
+
+    const alreadyExists = playedTitleTokenSetsRef.current.some(existing => tokenSimilarity(existing, tokens) >= 0.8);
+    if (alreadyExists) return;
+
+    playedTitleTokenSetsRef.current = [tokens, ...playedTitleTokenSetsRef.current].slice(0, 80);
+  };
+
+  const favoriteIds = useMemo(() => new Set(favorites.map(s => s.id)), [favorites]);
+  const fallbackSongs = useMemo(() => {
+    if (songs.length > 0) return songs;
+    const historyIds = new Set(searchHistory.map(h => h.id));
+    return [...searchHistory, ...trendingSongs.filter(t => !historyIds.has(t.id))].slice(0, 30);
+  }, [songs, searchHistory, trendingSongs]);
 
 
 
@@ -208,7 +294,9 @@ export default function App() {
   const fetchQueue = async (song) => {
     setIsFetchingQueue(true);
     try {
+      const minQueueTarget = 20;
       const apiEndpoint = import.meta.env.DEV ? `/api/search` : `/.netlify/functions/search`;
+      const currentSongTitle = song.title || '';
 
       const titleLower = song.title.toLowerCase();
       const searchLower = searchQuery.toLowerCase();
@@ -253,41 +341,139 @@ export default function App() {
 
       const currentWords = getSignificantWords(song.title);
 
-      const filteredQueue = data.filter(s => {
-        if (s.id === song.id) return false;
-        if (s.durationSeconds && s.durationSeconds > 420) return false;
+      let newQueue = [];
+      if (data && data.length > 0) {
+        const filteredQueue = data.filter(s => {
+          if (s.id === song.id) return false;
+          if (s.durationSeconds && s.durationSeconds > 420) return false;
+          if (s.durationSeconds && s.durationSeconds < 90) return false;
+          if (isLikelySameSong(s.title, currentSongTitle)) return false;
 
-        const lowerTitle = s.title.toLowerCase();
+          const lowerTitle = s.title.toLowerCase();
+          const badWords = ["jukebox", "mashup", "news", "interview", "podcast", "vlog", "speech", "review", "reaction", "trailer", "teaser", "promo", "audio launch", "press", "telugu", "hindi", "malayalam", "kannada", "whatsapp status"];
+          for (let word of badWords) {
+            if (lowerTitle.includes(word)) return false;
+          }
 
-        const badWords = ["jukebox", "mashup", "news", "interview", "podcast", "vlog", "speech", "review", "reaction", "trailer", "teaser", "promo", "audio launch", "press", "telugu", "hindi", "malayalam", "kannada", "whatsapp status"];
-        for (let word of badWords) {
-          if (lowerTitle.includes(word)) return false;
+          const sWords = getSignificantWords(s.title);
+          let matchCount = 0;
+          for (let w of currentWords) {
+            if (sWords.includes(w)) matchCount++;
+          }
+
+          if (matchCount >= 2) return false;
+          if (currentWords.length === 1 && matchCount === 1) return false;
+          return true;
+        });
+
+        const relaxedPool = data
+          .filter(s => s.id !== song.id && (s.durationSeconds == null || s.durationSeconds < 420))
+          .filter(s => !s.durationSeconds || s.durationSeconds >= 90)
+          .filter(s => !isLikelySameSong(s.title, currentSongTitle))
+          .sort(() => 0.5 - Math.random());
+
+        const merged = [
+          ...filteredQueue,
+          ...relaxedPool.filter(s => !filteredQueue.some(f => f.id === s.id))
+        ];
+
+        newQueue = merged.slice(0, 40);
+      }
+
+      if (newQueue.length === 0) {
+        const fallbacks = [...songs, ...searchHistory, ...trendingSongs].filter(s => s.id !== song.id);
+        const uniqueFallbacks = Array.from(new Map(fallbacks.map(item => [item.id, item])).values());
+        newQueue = uniqueFallbacks.sort(() => 0.5 - Math.random()).slice(0, 30);
+      }
+
+      if (newQueue.length < minQueueTarget) {
+        const extraFallbacks = [...songs, ...searchHistory, ...trendingSongs].filter(s => s.id !== song.id);
+        const uniqueExtras = Array.from(new Map(extraFallbacks.map(item => [item.id, item])).values());
+        const missing = uniqueExtras
+          .filter(s => !newQueue.some(q => q.id === s.id))
+          .filter(s => !isLikelySameSong(s.title, currentSongTitle));
+        newQueue = [...newQueue, ...missing].slice(0, 40);
+      }
+
+      if (newQueue.length < minQueueTarget) {
+        try {
+          const topUpRes = await fetch(`${apiEndpoint}?q=${encodeURIComponent('tamil trending latest hit video songs')}`);
+          let topUpData = await topUpRes.json();
+          if (!Array.isArray(topUpData)) topUpData = topUpData.videos || [];
+          const cleanTopUp = topUpData
+            .filter(s => s.id !== song.id && (s.durationSeconds == null || s.durationSeconds < 420))
+            .filter(s => !s.durationSeconds || s.durationSeconds >= 90)
+            .filter(s => !newQueue.some(q => q.id === s.id))
+            .filter(s => !isLikelySameSong(s.title, currentSongTitle));
+          newQueue = [...newQueue, ...cleanTopUp].slice(0, 40);
+        } catch (topUpError) {
+          console.warn('Queue top-up fetch failed:', topUpError);
         }
-
-        const sWords = getSignificantWords(s.title);
-        let matchCount = 0;
-        for (let w of currentWords) {
-          if (sWords.includes(w)) matchCount++;
-        }
-
-        // Prevent showing different versions (audio, lyric video) of the same song
-        if (matchCount >= 2) return false;
-        if (currentWords.length === 1 && matchCount === 1) return false;
-
-        return true;
-      });
-
-      let newQueue = filteredQueue.length >= 10 ? filteredQueue : data.filter(s => s.id !== song.id && s.durationSeconds < 420).sort(() => 0.5 - Math.random()).slice(0, 30);
+      }
 
       setQueue(prevQueue => {
+        const normalizeArtist = (artist = '') =>
+          artist.toLowerCase().replace(/ - topic|vevo/gi, '').replace(/[^a-z0-9 ]/g, ' ').trim();
+        const normalizeTitle = (title = '') => normalizeTitleKey(title).split(' ').filter(Boolean).slice(0, 6).join(' ');
+
         const existingIds = new Set(prevQueue.map(s => s.id));
         existingIds.add(song.id);
         if (currentSong) existingIds.add(currentSong.id);
 
         sessionPlayedIds.current.forEach(id => existingIds.add(id));
 
-        const filteredNew = newQueue.filter(s => !existingIds.has(s.id));
-        return [...prevQueue, ...filteredNew].slice(0, 50);
+        const existingArtistCounts = prevQueue.reduce((acc, item) => {
+          const key = normalizeArtist(item.artist);
+          if (key) acc.set(key, (acc.get(key) || 0) + 1);
+          return acc;
+        }, new Map());
+        const seenTitles = new Set(prevQueue.map(item => normalizeTitle(item.title)));
+        seenTitles.add(normalizeTitle(song.title));
+        const seenTitleTokens = [
+          ...prevQueue.map(item => titleTokenSet(item.title)),
+          titleTokenSet(song.title),
+          ...playedTitleTokenSetsRef.current
+        ];
+        const maxPerArtist = 2;
+
+        const diversifiedNew = [];
+        for (const candidate of newQueue) {
+          if (existingIds.has(candidate.id)) continue;
+
+          const titleKey = normalizeTitle(candidate.title);
+          if (seenTitles.has(titleKey)) continue;
+          const candidateTokens = titleTokenSet(candidate.title);
+          const tooSimilarInQueue = seenTitleTokens.some(tokens => tokenSimilarity(candidateTokens, tokens) >= 0.66);
+          if (tooSimilarInQueue) continue;
+
+          const artistKey = normalizeArtist(candidate.artist);
+          if (artistKey && (existingArtistCounts.get(artistKey) || 0) >= maxPerArtist) continue;
+
+          diversifiedNew.push(candidate);
+          seenTitles.add(titleKey);
+          seenTitleTokens.push(candidateTokens);
+          if (artistKey) {
+            existingArtistCounts.set(artistKey, (existingArtistCounts.get(artistKey) || 0) + 1);
+          }
+        }
+
+        if (diversifiedNew.length < minQueueTarget) {
+          for (const candidate of newQueue) {
+            if (diversifiedNew.length >= minQueueTarget) break;
+            if (existingIds.has(candidate.id) || diversifiedNew.some(item => item.id === candidate.id)) continue;
+            const titleKey = normalizeTitle(candidate.title);
+            if (seenTitles.has(titleKey)) continue;
+            if (isLikelySameSong(candidate.title, currentSongTitle)) continue;
+            const candidateTokens = titleTokenSet(candidate.title);
+            const tooSimilarInQueue = seenTitleTokens.some(tokens => tokenSimilarity(candidateTokens, tokens) >= 0.66);
+            if (tooSimilarInQueue) continue;
+            diversifiedNew.push(candidate);
+            seenTitles.add(titleKey);
+            seenTitleTokens.push(candidateTokens);
+          }
+        }
+
+        return [...prevQueue, ...diversifiedNew].slice(0, 50);
       });
     } catch (err) {
       console.error(err);
@@ -301,6 +487,7 @@ export default function App() {
     setIsPlaying(true);
     setActiveTab('Music');
     sessionPlayedIds.current.add(song.id);
+    addPlayedTitleTokens(song.title);
 
     setSearchHistory(prev => {
       const filtered = prev.filter(s => s.id !== song.id);
@@ -311,7 +498,7 @@ export default function App() {
       setQueue([]);
       fetchQueue(song);
     } else {
-      setQueue(prev => prev.filter(s => s.id !== song.id));
+      setQueue(prev => prev.filter(s => s.id !== song.id && !isLikelySameSong(s.title, song.title)));
       if (queue.length <= 15) {
         fetchQueue(song);
       }
@@ -344,23 +531,31 @@ export default function App() {
     } else if (isFetchingQueue) {
       // Don't fall back to search results if queue is still loading
       return;
-    } else if (songs.length > 0) {
-      const idx = songs.findIndex(s => s.id === currentSong?.id);
-      if (idx !== -1 && idx < songs.length - 1) {
-        playSong(songs[idx + 1]);
+    } else if (fallbackSongs.length > 0) {
+      const unplayedFallback = fallbackSongs.filter(s => {
+        if (sessionPlayedIds.current.has(s.id)) return false;
+        if (currentSong && isLikelySameSong(s.title, currentSong.title)) return false;
+        const tokens = titleTokenSet(s.title);
+        return !playedTitleTokenSetsRef.current.some(existing => tokenSimilarity(existing, tokens) >= 0.66);
+      });
+      const source = unplayedFallback.length > 0 ? unplayedFallback : fallbackSongs;
+
+      const idx = source.findIndex(s => s.id === currentSong?.id);
+      if (idx !== -1 && idx < source.length - 1) {
+        playSong(source[idx + 1]);
       } else {
-        playSong(songs[0]); // loop back
+        playSong(source[0]); // loop back
       }
     }
   };
 
   const playPrev = () => {
-    if (songs.length === 0 && queue.length === 0) return;
-    const idx = songs.findIndex(s => s.id === currentSong?.id);
+    if (fallbackSongs.length === 0) return;
+    const idx = fallbackSongs.findIndex(s => s.id === currentSong?.id);
     if (idx > 0) {
-      playSong(songs[idx - 1]);
-    } else if (songs.length > 0) {
-      playSong(songs[0]);
+      playSong(fallbackSongs[idx - 1]);
+    } else {
+      playSong(fallbackSongs[0]);
     }
   };
 
@@ -369,10 +564,8 @@ export default function App() {
   const playNextRef = useRef(playNext);
   const playPrevRef = useRef(playPrev);
 
-  useEffect(() => {
-    playNextRef.current = playNext;
-    playPrevRef.current = playPrev;
-  }, [playNext, playPrev]);
+  playNextRef.current = playNext;
+  playPrevRef.current = playPrev;
 
   useEffect(() => {
     if ('mediaSession' in navigator && currentSong) {
@@ -414,7 +607,7 @@ export default function App() {
             playerRef.current.seekTo(playerRef.current.getCurrentTime() + 10, "seconds");
           }
         });
-      } catch (error) {
+      } catch {
         console.log("Seek actions not supported in this browser version.");
       }
     }
@@ -428,9 +621,9 @@ export default function App() {
     }
   }, [isPlaying]);
 
-  const displaySongs = songs.length > 0
-    ? songs
-    : [...searchHistory, ...trendingSongs.filter(t => !searchHistory.some(h => h.id === t.id))].slice(0, 30);
+  const displaySongs = fallbackSongs;
+  const hasActiveSearchResults = searchQuery.trim().length > 0 && songs.length > 0;
+  const shouldShowQueue = Boolean(currentSong) && !hasActiveSearchResults;
 
   return (
     <div className="flex items-center justify-center bg-gray-900 overflow-hidden font-['Outfit']" style={{ height: '100dvh' }}>
@@ -447,8 +640,8 @@ export default function App() {
             playing={isPlaying}
             onProgress={handleProgress}
             onDuration={handleDuration}
-            onEnded={playNext}
-            onError={playNext}
+            onEnded={() => playNextRef.current()}
+            onError={() => playNextRef.current()}
             volume={1}
             width="50px"
             height="50px"
@@ -519,7 +712,7 @@ export default function App() {
                       <p className="text-[11px] text-gray-500 truncate mt-0.5">{song.artist}</p>
                     </div>
                     <div className="w-8 h-8 rounded-full flex items-center justify-center transition-colors">
-                      <AnimatedHeart size={16} isFavorite={favorites.some(s => s.id === song.id)} onClick={(e) => toggleFavorite(e, song)} />
+                      <AnimatedHeart size={16} isFavorite={favoriteIds.has(song.id)} onClick={(e) => toggleFavorite(e, song)} />
                     </div>
                     <div onClick={(e) => { e.stopPropagation(); setShowPlaylistModal({ isOpen: true, songInfo: song }); }} className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition-colors cursor-pointer shrink-0">
                       <MoreHorizontal size={18} />
@@ -651,7 +844,7 @@ export default function App() {
                       <p className="text-[11px] text-gray-500 truncate mt-0.5">{song.artist}</p>
                     </div>
                     <div className="w-8 h-8 rounded-full flex items-center justify-center transition-colors">
-                      <AnimatedHeart size={16} isFavorite={favorites.some(s => s.id === song.id)} onClick={(e) => toggleFavorite(e, song)} />
+                      <AnimatedHeart size={16} isFavorite={favoriteIds.has(song.id)} onClick={(e) => toggleFavorite(e, song)} />
                     </div>
                     <div onClick={(e) => { e.stopPropagation(); setShowPlaylistModal({ isOpen: true, songInfo: song }); }} className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition-colors cursor-pointer shrink-0">
                       <MoreHorizontal size={18} />
@@ -702,7 +895,7 @@ export default function App() {
               </div>
 
               <div className="space-y-3 pb-6">
-                {displaySongs.map((song, idx) => (
+                {displaySongs.map((song) => (
                   <div
                     key={song.id}
                     onClick={() => playSong(song)}
@@ -714,7 +907,7 @@ export default function App() {
                       <p className="text-[11px] text-gray-500 truncate mt-0.5">{song.artist}</p>
                     </div>
                     <div className="w-8 h-8 rounded-full flex items-center justify-center transition-colors">
-                      <AnimatedHeart size={16} isFavorite={favorites.some(s => s.id === song.id)} onClick={(e) => toggleFavorite(e, song)} />
+                      <AnimatedHeart size={16} isFavorite={favoriteIds.has(song.id)} onClick={(e) => toggleFavorite(e, song)} />
                     </div>
                     <div onClick={(e) => { e.stopPropagation(); setShowPlaylistModal({ isOpen: true, songInfo: song }); }} className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition-colors cursor-pointer shrink-0">
                       <MoreHorizontal size={18} />
@@ -764,7 +957,7 @@ export default function App() {
                       <h2 className="text-xl font-bold text-white truncate leading-tight">{currentSong.title}</h2>
                       <p className="text-[13px] text-gray-400 font-medium mt-1 truncate">{currentSong.artist || 'Unknown Artist'}</p>
                     </div>
-                    <AnimatedHeart size={20} className="shrink-0 mb-1" isFavorite={favorites.some(s => s.id === currentSong.id)} onClick={(e) => toggleFavorite(e, currentSong)} />
+                    <AnimatedHeart size={20} className="shrink-0 mb-1" isFavorite={favoriteIds.has(currentSong.id)} onClick={(e) => toggleFavorite(e, currentSong)} />
                   </div>
 
                   {/* Visual Equalizer */}
@@ -944,7 +1137,7 @@ export default function App() {
             </div>
             <div className="flex items-center gap-1 shrink-0 px-1">
               <button onClick={(e) => { e.stopPropagation(); toggleFavorite(e, currentSong); }} className="p-2 text-gray-400 hover:text-white">
-                <Heart size={16} fill={favorites.some(s => s.id === currentSong.id) ? '#8cd92b' : 'none'} className={favorites.some(s => s.id === currentSong.id) ? 'text-[#8cd92b]' : ''} />
+                <Heart size={16} fill={favoriteIds.has(currentSong.id) ? '#8cd92b' : 'none'} className={favoriteIds.has(currentSong.id) ? 'text-[#8cd92b]' : ''} />
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); togglePlay(); }}
@@ -1034,7 +1227,7 @@ export default function App() {
         {/* Middle Column (Main Content) */}
         <div className="flex-1 flex flex-col p-8 overflow-hidden bg-[#121422]">
           {/* Header & Search */}
-          <form onSubmit={(e) => { searchYoutube(e); setCurrentSong(null); }} className="mb-8 z-20 shrink-0">
+          <form onSubmit={searchYoutube} className="mb-8 z-20 shrink-0">
             <div className="relative max-w-2xl flex gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-6 top-4 text-gray-500" size={18} />
@@ -1056,12 +1249,12 @@ export default function App() {
           <div className="flex-1 overflow-y-auto w-full max-w-4xl no-scrollbar pb-10 flex flex-col pt-2">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold text-white tracking-wide">
-                {currentSong ? "Up Next" : (searchQuery && songs.length > 0 ? "Search Results" : (searchHistory.length > 0 ? "Recent Plays & Suggestions" : "Suggested For You"))}
+                {shouldShowQueue ? "Up Next" : (hasActiveSearchResults ? "Search Results" : (searchHistory.length > 0 ? "Recent Plays & Suggestions" : "Suggested For You"))}
               </h3>
-              {(currentSong ? queue.length > 0 : displaySongs.length > 0) && <span className="text-xs text-[#8cd92b] cursor-pointer font-semibold hover:underline">See all</span>}
+              {(shouldShowQueue ? queue.length > 0 : displaySongs.length > 0) && <span className="text-xs text-[#8cd92b] cursor-pointer font-semibold hover:underline">See all</span>}
             </div>
 
-            {currentSong ? (
+            {shouldShowQueue ? (
               <div className="space-y-1">
                 {isFetchingQueue && queue.length === 0 && (
                   <div className="flex items-center justify-center py-10">
@@ -1069,40 +1262,26 @@ export default function App() {
                   </div>
                 )}
                 {queue.map((song, idx) => (
-                  <div
+                  <DesktopSongRow
                     key={song.id}
-                    onClick={() => playSong(song, true)}
-                    className="flex items-center gap-4 hover:bg-[#1a1c2a] p-3 rounded-2xl cursor-pointer transition-all border border-transparent hover:border-[#262837]"
-                  >
-                    <span className="text-gray-500 font-bold text-sm w-6 text-center opacity-70">{String(idx + 1).padStart(2, '0')}</span>
-                    <img src={song.thumbnail} alt={song.title} className="w-12 h-12 rounded-xl object-cover shadow-sm" />
-                    <div className="flex-1 overflow-hidden pr-4">
-                      <h4 className="font-semibold text-white text-sm truncate">{song.title}</h4>
-                      <p className="text-xs text-gray-400 truncate mt-1">{song.artist}</p>
-                    </div>
-                    <div className="text-xs text-gray-500 w-12 text-right mr-4">{formatTime(song.durationSeconds)}</div>
-                    <AnimatedHeart size={16} isFavorite={favorites.some(s => s.id === song.id)} onClick={(e) => toggleFavorite(e, song)} />
-                    <div className="text-gray-500 hover:text-white transition-colors ml-4 mr-2"><MoreHorizontal size={16} /></div>
-                  </div>
+                    song={song}
+                    index={idx}
+                    onSelect={() => playSong(song, true)}
+                    isFavorite={favoriteIds.has(song.id)}
+                    onToggleFavorite={(e) => toggleFavorite(e, song)}
+                  />
                 ))}
               </div>
             ) : displaySongs.length > 0 ? (
               <div className="space-y-1">
-                {displaySongs.map((song, idx) => (
-                  <div
+                {displaySongs.map((song) => (
+                  <DesktopSongRow
                     key={song.id}
-                    onClick={() => playSong(song)}
-                    className="flex items-center gap-4 hover:bg-[#1a1c2a] p-3 rounded-2xl cursor-pointer transition-all border border-transparent hover:border-[#262837]"
-                  >
-                    <img src={song.thumbnail} alt={song.title} className="w-12 h-12 rounded-xl object-cover shadow-sm" />
-                    <div className="flex-1 overflow-hidden pr-4">
-                      <h4 className="font-semibold text-white text-sm truncate">{song.title}</h4>
-                      <p className="text-xs text-gray-400 truncate mt-1">{song.artist}</p>
-                    </div>
-                    <div className="text-xs text-gray-500 w-12 text-right mr-4">{formatTime(song.durationSeconds)}</div>
-                    <AnimatedHeart size={16} isFavorite={favorites.some(s => s.id === song.id)} onClick={(e) => toggleFavorite(e, song)} />
-                    <div className="text-gray-500 hover:text-white transition-colors ml-4 mr-2"><MoreHorizontal size={16} /></div>
-                  </div>
+                    song={song}
+                    onSelect={() => playSong(song)}
+                    isFavorite={favoriteIds.has(song.id)}
+                    onToggleFavorite={(e) => toggleFavorite(e, song)}
+                  />
                 ))}
               </div>
             ) : (
@@ -1140,7 +1319,7 @@ export default function App() {
                   <h4 className="font-bold text-white text-base truncate pr-2">{currentSong.title}</h4>
                   <p className="text-xs text-gray-400 truncate mt-1">{currentSong.artist || 'Unknown Artist'}</p>
                 </div>
-                <AnimatedHeart size={20} className="shrink-0 mt-1" isFavorite={favorites.some(s => s.id === currentSong.id)} onClick={(e) => toggleFavorite(e, currentSong)} />
+                <AnimatedHeart size={20} className="shrink-0 mt-1" isFavorite={favoriteIds.has(currentSong.id)} onClick={(e) => toggleFavorite(e, currentSong)} />
               </div>
 
               {/* Visual Equalizer */}
