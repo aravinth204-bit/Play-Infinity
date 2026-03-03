@@ -49,9 +49,9 @@ export default defineConfig({
           }
 
           try {
-            const ytdl = require('@distube/ytdl-core');
-            const info = await ytdl.getInfo(videoId);
-            const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' });
+            const ytdl = await import('@distube/ytdl-core');
+            const info = await ytdl.default.getInfo(videoId);
+            const format = ytdl.default.chooseFormat(info.formats, { quality: 'highestaudio' });
 
             if (format && format.url) {
               res.setHeader('Access-Control-Allow-Origin', '*');
