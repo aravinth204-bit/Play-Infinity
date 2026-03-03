@@ -567,7 +567,7 @@ export default function App() {
   playNextRef.current = playNext;
   playPrevRef.current = playPrev;
 
-  useEffect(() => {
+  const setupMediaSession = () => {
     if ('mediaSession' in navigator && currentSong) {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: currentSong.title,
@@ -583,7 +583,7 @@ export default function App() {
 
       navigator.mediaSession.setActionHandler('play', () => {
         setIsPlaying(true);
-        silentAudioRef.current?.play();
+        silentAudioRef.current?.play().catch(e => console.log(e));
       });
       navigator.mediaSession.setActionHandler('pause', () => {
         setIsPlaying(false);
@@ -608,9 +608,13 @@ export default function App() {
           }
         });
       } catch {
-        console.log("Seek actions not supported in this browser version.");
+        // Seek actions not supported in this browser version.
       }
     }
+  };
+
+  useEffect(() => {
+    setupMediaSession();
   }, [currentSong]);
 
   useEffect(() => {
@@ -629,7 +633,7 @@ export default function App() {
     <div className="flex items-center justify-center bg-gray-900 overflow-hidden font-['Outfit']" style={{ height: '100dvh' }}>
 
       {/* Invisible HTML5 Audio to keep browser session alive for iOS/Android Background playing */}
-      <audio ref={silentAudioRef} loop src="data:audio/mp3;base64,//OwgAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAAFAAAH8AACBwYICQoLDA0ODxAREhMUFRYXGBkZGhscHR4fICEiIyQlJicpKSorLC0uLzAxMjM0NTY3ODk5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlbW1xdXl9gYWJjZGVmZ2hpamtc" />
+      <audio ref={silentAudioRef} loop playsInline src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=" />
 
       {/* Invisible YouTube Player */}
       {currentSong && (
@@ -642,6 +646,7 @@ export default function App() {
             onDuration={handleDuration}
             onEnded={() => playNextRef.current()}
             onError={() => playNextRef.current()}
+            onPlay={() => setupMediaSession()}
             volume={1}
             width="50px"
             height="50px"
