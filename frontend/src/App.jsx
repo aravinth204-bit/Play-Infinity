@@ -262,9 +262,17 @@ export default function App() {
           return;
         }
         const apiEndpoint = `/api/search`;
-        const res = await fetch(`${apiEndpoint}?q=tamil+latest+trending+hit+songs+video`);
+        // Strictly search for Tamil audio songs, avoiding jukebox/collections
+        const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent('tamil latest hit songs audio -jukebox -collections -mashup -nonstop')}`);
         const data = await res.json();
-        const songsList = Array.isArray(data) ? data : (data.videos || []);
+        let songsList = Array.isArray(data) ? data : (data.videos || []);
+
+        // Stricter filtering for trending
+        songsList = songsList.filter(s => {
+          const title = s.title.toLowerCase();
+          return !title.includes('jukebox') && !title.includes('collections') && !title.includes('mashup') && !title.includes('nonstop') && !title.includes('full album');
+        });
+
         const shuffled = songsList.sort(() => 0.5 - Math.random()).slice(0, 20);
         setTrendingSongs(shuffled);
         sessionStorage.setItem('trendingSongs', JSON.stringify(shuffled));
@@ -282,9 +290,17 @@ export default function App() {
     try {
       // Fetch from local dev proxy or Vercel serverless function
       const apiEndpoint = `/api/search`;
-      const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(searchQuery)}`);
+      const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(searchQuery + ' tamil audio song -jukebox')}`);
       const data = await res.json();
-      setSongs(Array.isArray(data) ? data : (data.videos || []));
+      let results = Array.isArray(data) ? data : (data.videos || []);
+
+      // Strict filter for single songs only
+      results = results.filter(s => {
+        const t = s.title.toLowerCase();
+        return !t.includes('jukebox') && !t.includes('mashup') && !t.includes('collection') && !t.includes('nonstop') && !t.includes('full album');
+      });
+
+      setSongs(results);
     } catch (err) {
       console.error(err);
       alert("Failed to search. Please try again later.");
@@ -311,20 +327,20 @@ export default function App() {
       let moodQuery = "";
 
       if (kuthuKeywords.some(w => searchLower.includes(w) || titleLower.includes(w))) {
-        moodQuery = "tamil mass kuthu dance hit video songs";
+        moodQuery = "tamil mass kuthu audio songs -jukebox";
       } else if (melodyKeywords.some(w => searchLower.includes(w) || titleLower.includes(w))) {
-        moodQuery = "tamil melody love romantic hit video songs";
+        moodQuery = "tamil melody love romantic audio songs -jukebox";
       } else if (sadKeywords.some(w => searchLower.includes(w) || titleLower.includes(w))) {
-        moodQuery = "tamil sad feelings hit video songs";
+        moodQuery = "tamil sad feelings audio songs -jukebox";
       } else {
         let artist = song.artist?.replace(/ - Topic|VEVO/gi, '').split(',')[0].trim();
         if (artist && artist.toLowerCase() !== 'various artists' && artist.length > 2) {
-          moodQuery = `${artist} super hit tamil video songs`;
+          moodQuery = `${artist} tamil audio songs -jukebox`;
         } else {
           const fallbacks = [
-            "tamil mass kuthu dance hit video songs",
-            "tamil melody love romantic hit video songs",
-            "tamil trending latest hit video songs"
+            "tamil mass kuthu audio songs -jukebox",
+            "tamil melody love romantic audio songs -jukebox",
+            "tamil latest hit audio songs -jukebox"
           ];
           moodQuery = fallbacks[Math.floor(Math.random() * fallbacks.length)];
         }
@@ -352,7 +368,7 @@ export default function App() {
           if (isLikelySameSong(s.title, currentSongTitle)) return false;
 
           const lowerTitle = s.title.toLowerCase();
-          const badWords = ["jukebox", "mashup", "news", "interview", "podcast", "vlog", "speech", "review", "reaction", "trailer", "teaser", "promo", "audio launch", "press", "telugu", "hindi", "malayalam", "kannada", "whatsapp status"];
+          const badWords = ["jukebox", "mashup", "collections", "nonstop", "full album", "news", "interview", "podcast", "vlog", "speech", "review", "reaction", "trailer", "teaser", "promo", "audio launch", "press", "telugu", "hindi", "malayalam", "kannada", "whatsapp status"];
           for (let word of badWords) {
             if (lowerTitle.includes(word)) return false;
           }
@@ -491,7 +507,9 @@ export default function App() {
     'https://pipedapi.kavin.rocks',
     'https://api.piped.victr.me',
     'https://piped-api.lunar.icu',
-    'https://api.piped.projectsegfau.lt'
+    'https://api.piped.projectsegfau.lt',
+    'https://pipedapi.metafates.me',
+    'https://api-piped.mha.fi'
   ];
 
   const fetchPipedStream = async (videoId) => {
@@ -500,9 +518,13 @@ export default function App() {
         const response = await fetch(`${instance}/streams/${videoId}`);
         if (!response.ok) continue;
         const data = await response.json();
-        // Return the first audio-only stream or best available
-        const audioStream = data.audioStreams?.find(s => s.mimeType.includes('audio/mp4')) || data.audioStreams?.[0];
-        if (audioStream?.url) return audioStream.url;
+        // Priority: Higher bitrate audio streams (at least 128kbps if possible)
+        const audioStreams = data.audioStreams || [];
+        const bestAudio = audioStreams
+          .filter(s => s.mimeType.includes('audio/mp4'))
+          .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0] || audioStreams[0];
+
+        if (bestAudio?.url) return bestAudio.url;
       } catch (e) {
         console.warn(`Piped instance ${instance} failed:`, e);
       }
@@ -667,6 +689,25 @@ export default function App() {
     }
   }, [isPlaying]);
 
+  // Audio Context Unlock for Mobile
+  useEffect(() => {
+    const unlock = () => {
+      if (silentAudioRef.current) {
+        silentAudioRef.current.play().then(() => {
+          silentAudioRef.current.pause();
+          window.removeEventListener('click', unlock);
+          window.removeEventListener('touchstart', unlock);
+        }).catch(() => { });
+      }
+    };
+    window.addEventListener('click', unlock);
+    window.addEventListener('touchstart', unlock);
+    return () => {
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('touchstart', unlock);
+    };
+  }, []);
+
   useEffect(() => {
     if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState || !currentSong || !duration) return;
     try {
@@ -715,7 +756,8 @@ export default function App() {
                 forceAudio: true,
                 attributes: {
                   playsInline: true,
-                  webkitPlaysInline: true
+                  webkitPlaysInline: true,
+                  crossOrigin: "anonymous"
                 }
               },
               youtube: {
