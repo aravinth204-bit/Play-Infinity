@@ -73,6 +73,50 @@ const DesktopSongRow = React.memo(function DesktopSongRow({
 });
 
 export default function App() {
+  // Media Session API for notification controls and background play
+  useEffect(() => {
+    if ('mediaSession' in navigator && currentSong) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentSong.title,
+        artist: currentSong.artist || 'Unknown Artist',
+        album: 'Play Infinity',
+        artwork: [
+          { src: currentSong.thumbnail, sizes: '96x96', type: 'image/png' },
+          { src: currentSong.thumbnail, sizes: '128x128', type: 'image/png' },
+          { src: currentSong.thumbnail, sizes: '192x192', type: 'image/png' },
+          { src: currentSong.thumbnail, sizes: '256x256', type: 'image/png' },
+          { src: currentSong.thumbnail, sizes: '384x384', type: 'image/png' },
+          { src: currentSong.thumbnail, sizes: '512x512', type: 'image/png' },
+        ]
+      });
+
+      navigator.mediaSession.setActionHandler('play', () => {
+        setIsPlaying(true);
+      });
+      navigator.mediaSession.setActionHandler('pause', () => {
+        setIsPlaying(false);
+      });
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        playPrev();
+      });
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        playNext();
+      });
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (playerRef.current) {
+          playerRef.current.seekTo(details.seekTime);
+        }
+      });
+    }
+  }, [currentSong]);
+
+  // Update playback state in notification
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+    }
+  }, [isPlaying]);
+
   const [activeTab, setActiveTab] = useState('Home');
   const [currentSong, setCurrentSong] = useState(null);
   const [useIframeFallback, setUseIframeFallback] = useState(false);
