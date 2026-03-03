@@ -259,7 +259,7 @@ export default function App() {
           setTrendingSongs(JSON.parse(cached));
           return;
         }
-        const apiEndpoint = import.meta.env.DEV ? `/api/search` : `/.netlify/functions/search`;
+        const apiEndpoint = `/api/search`;
         const res = await fetch(`${apiEndpoint}?q=tamil+latest+trending+hit+songs+video`);
         const data = await res.json();
         const songsList = Array.isArray(data) ? data : (data.videos || []);
@@ -279,7 +279,7 @@ export default function App() {
     setLoading(true);
     try {
       // Fetch from our local dev proxy or netlify function
-      const apiEndpoint = import.meta.env.DEV ? `/api/search` : `/.netlify/functions/search`;
+      const apiEndpoint = `/api/search`;
       const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(searchQuery)}`);
       const data = await res.json();
       setSongs(Array.isArray(data) ? data : (data.videos || []));
@@ -295,7 +295,7 @@ export default function App() {
     setIsFetchingQueue(true);
     try {
       const minQueueTarget = 20;
-      const apiEndpoint = import.meta.env.DEV ? `/api/search` : `/.netlify/functions/search`;
+      const apiEndpoint = `/api/search`;
       const currentSongTitle = song.title || '';
 
       const titleLower = song.title.toLowerCase();
