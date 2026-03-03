@@ -636,43 +636,31 @@ export default function App() {
         ]
       });
 
-      navigator.mediaSession.setActionHandler('play', () => {
-        setIsPlaying(true);
-        const internalPlayer = playerRef.current?.getInternalPlayer?.();
-        if (internalPlayer?.playVideo) internalPlayer.playVideo();
-        if (internalPlayer?.play) internalPlayer.play().catch(() => { });
-        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
-        silentAudioRef.current?.play().catch(() => { });
-      });
-      navigator.mediaSession.setActionHandler('pause', () => {
-        setIsPlaying(false);
-        const internalPlayer = playerRef.current?.getInternalPlayer?.();
-        if (internalPlayer?.pauseVideo) internalPlayer.pauseVideo();
-        if (internalPlayer?.pause) internalPlayer.pause();
-        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
-        silentAudioRef.current?.pause();
-      });
-      navigator.mediaSession.setActionHandler('previoustrack', () => {
-        if (playPrevRef.current) playPrevRef.current();
-      });
-      navigator.mediaSession.setActionHandler('nexttrack', () => {
-        if (playNextRef.current) playNextRef.current();
-      });
-
       try {
-        navigator.mediaSession.setActionHandler('seekbackward', () => {
+        navigator.mediaSession.setActionHandler('play', () => {
+          setIsPlaying(true);
+          silentAudioRef.current?.play().catch(() => { });
+        });
+        navigator.mediaSession.setActionHandler('pause', () => {
+          setIsPlaying(false);
+          silentAudioRef.current?.pause();
+        });
+        navigator.mediaSession.setActionHandler('previoustrack', () => {
+          if (playPrevRef.current) playPrevRef.current();
+        });
+        navigator.mediaSession.setActionHandler('nexttrack', () => {
+          if (playNextRef.current) playNextRef.current();
+        });
+        navigator.mediaSession.setActionHandler('seekto', (details) => {
           if (playerRef.current) {
-            playerRef.current.seekTo(Math.max(playerRef.current.getCurrentTime() - 10, 0), "seconds");
+            playerRef.current.seekTo(details.seekTime, "seconds");
           }
         });
-        navigator.mediaSession.setActionHandler('seekforward', () => {
-          if (playerRef.current) {
-            playerRef.current.seekTo(playerRef.current.getCurrentTime() + 10, "seconds");
-          }
-        });
-      } catch { }
+      } catch (e) {
+        console.warn("MediaSession handlers failed:", e);
+      }
     }
-  }, [currentSong]);
+  }, [currentSong, setIsPlaying]);
 
   useEffect(() => {
     setUseIframeFallback(false);
@@ -743,10 +731,17 @@ export default function App() {
             onDuration={handleDuration}
             onEnded={() => playNextRef.current()}
             onError={(e) => {
-              if (!useIframeFallback) {
-                console.log("Audio proxy failed! Falling back to YouTube iframe...", e);
-                setUseIframeFallback(true);
+              console.error("Playback error:", e);
+              // If we are in the background, don't switch to iframe which fails backgrounding
+              if (document.visibilityState === 'visible') {
+                if (!useIframeFallback) {
+                  console.log("Audio proxy failed! Falling back to YouTube iframe...", e);
+                  setUseIframeFallback(true);
+                } else {
+                  playNextRef.current();
+                }
               } else {
+                // In background, just try next song if this one fails
                 playNextRef.current();
               }
             }}
