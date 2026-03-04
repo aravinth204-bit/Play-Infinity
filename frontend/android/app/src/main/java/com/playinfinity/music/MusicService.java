@@ -11,6 +11,11 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
@@ -45,6 +50,10 @@ public class MusicService extends Service {
     private String currentUrl;
     private String fallbackUrl;
     private boolean fallbackTried;
+    private String currentTitle = "Play Infinity";
+    private String currentArtist = "Unknown Artist";
+    private String currentThumbnail;
+    private Bitmap currentBitmap;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable statusUpdateRunnable = new Runnable() {
         @Override
@@ -98,10 +107,27 @@ public class MusicService extends Service {
             fallbackUrl = newFallbackUrl;
         }
 
+        String newTitle = intent.getStringExtra("title");
+        String newArtist = intent.getStringExtra("artist");
+        String newThumbnail = intent.getStringExtra("thumbnail");
+
+        if (newTitle != null) currentTitle = newTitle;
+        if (newArtist != null) currentArtist = newArtist;
+        if (newThumbnail != null) {
+            if (!newThumbnail.equals(currentThumbnail)) {
+                currentThumbnail = newThumbnail;
+                currentBitmap = null; // reset for new fetch
+            }
+        }
+
         if (url != null && !url.isEmpty()) {
             playUrl(url);
         } else if (ACTION_PLAY.equals(action)) {
             player.play();
+        }
+
+        if (playerNotificationManager != null) {
+            playerNotificationManager.invalidate();
         }
 
         MediaButtonReceiver.handleIntent(mediaSession, intent);
@@ -226,7 +252,7 @@ public class MusicService extends Service {
                 new PlayerNotificationManager.MediaDescriptionAdapter() {
                     @Override
                     public String getCurrentContentTitle(com.google.android.exoplayer2.Player player) {
-                        return "Play Infinity";
+                        return currentTitle;
                     }
 
                     @Nullable
@@ -243,7 +269,7 @@ public class MusicService extends Service {
                     @Nullable
                     @Override
                     public String getCurrentContentText(com.google.android.exoplayer2.Player player) {
-                        return player.isPlaying() ? "Music Playing..." : "Music Paused";
+                        return currentArtist;
                     }
 
                     @Nullable
@@ -258,6 +284,26 @@ public class MusicService extends Service {
                             com.google.android.exoplayer2.Player player,
                             PlayerNotificationManager.BitmapCallback callback
                     ) {
+                        if (currentBitmap != null) return currentBitmap;
+                        
+                        if (currentThumbnail != null) {
+                            new Thread(() -> {
+                                try {
+                                    URL url = new URL(currentThumbnail);
+                                    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                                    connection.setDoInput(true);
+                                    connection.connect();
+                                    InputStream input = connection.getInputStream();
+                                    Bitmap myBitmap = BitmapFactory.decodeStream(input);
+                                    handler.post(() -> {
+                                        currentBitmap = myBitmap;
+                                        callback.onBitmap(myBitmap);
+                                    });
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+                            }).start();
+                        }
                         return null;
                     }
                 };
@@ -298,10 +344,10 @@ public class MusicService extends Service {
         playerNotificationManager.setPriority(NotificationCompat.PRIORITY_DEFAULT);
         playerNotificationManager.setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
         playerNotificationManager.setUseChronometer(true);
-        playerNotificationManager.setUseFastForwardAction(false);
-        playerNotificationManager.setUseRewindAction(false);
-        playerNotificationManager.setUseNextAction(false);
-        playerNotificationManager.setUsePreviousAction(false);
+        playerNotificationManager.setUseFastForwardAction(true);
+        playerNotificationManager.setUseRewindAction(true);
+        playerNotificationManager.setUseNextAction(true);
+        playerNotificationManager.setUsePreviousAction(true);
         playerNotificationManager.setPlayer(player);
     }
 

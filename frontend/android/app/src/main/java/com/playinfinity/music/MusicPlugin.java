@@ -72,6 +72,10 @@ public class MusicPlugin extends Plugin {
             intent.putExtra("fallbackUrl", fallbackUrl);
         }
 
+        intent.putExtra("title", call.getString("title"));
+        intent.putExtra("artist", call.getString("artist"));
+        intent.putExtra("thumbnail", call.getString("thumbnail"));
+
         startMusicService(intent);
         call.resolve();
     }

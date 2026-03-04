@@ -803,7 +803,10 @@ export default function App() {
       if (isPlaying && currentStreamUrl) {
         const ok = await callNativePlayer('play', {
           url: currentStreamUrl,
-          fallbackUrl: fallbackStreamUrl
+          fallbackUrl: fallbackStreamUrl,
+          title: currentSong.title,
+          artist: currentSong.artist,
+          thumbnail: currentSong.thumbnail
         });
         setNativePlaybackFailed(ok === false);
       } else if (!isPlaying) {
