@@ -34,6 +34,12 @@ public class MusicPlugin extends Plugin {
         Intent intent = new Intent(getContext(), MusicService.class);
         intent.setAction(MusicService.ACTION_PLAY);
         intent.putExtra("url", url);
+        
+        String fallbackUrl = call.getString("fallbackUrl");
+        if (fallbackUrl != null) {
+            intent.putExtra("fallbackUrl", fallbackUrl);
+        }
+
         startMusicService(intent);
         call.resolve();
     }
