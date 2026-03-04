@@ -29,8 +29,6 @@ public class MusicPlugin extends Plugin {
                 && ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
             openNotificationSettings();
-            call.reject("Notification permission required for background playback");
-            return;
         }
 
         Intent intent = new Intent(getContext(), MusicService.class);

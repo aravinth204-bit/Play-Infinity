@@ -55,7 +55,6 @@ if (backgroundAudio) {
 }
 
 const MusicPlayer = registerPlugin('MusicPlayer');
-const isNativeAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 
 const DesktopSongRow = React.memo(function DesktopSongRow({
   song,
@@ -85,6 +84,7 @@ const DesktopSongRow = React.memo(function DesktopSongRow({
 });
 
 export default function App() {
+  const isNativeAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
   const [activeTab, setActiveTab] = useState('Home');
   const [currentSong, setCurrentSong] = useState(null);
   const [useIframeFallback, setUseIframeFallback] = useState(false);
@@ -624,16 +624,19 @@ export default function App() {
   };
 
   const [directStreamUrl, setDirectStreamUrl] = useState(null);
+  const [nativePlaybackFailed, setNativePlaybackFailed] = useState(false);
   const currentStreamUrl = directStreamUrl || (currentSong ? `${streamEndpointBase}?videoId=${currentSong.id}` : '');
 
   const callNativePlayer = useCallback(async (method, payload = {}) => {
     if (!isNativeAndroid || !MusicPlayer?.[method]) return;
     try {
       await MusicPlayer[method](payload);
+      return true;
     } catch (e) {
       console.warn(`Native player ${method} failed:`, e);
+      return false;
     }
-  }, []);
+  }, [isNativeAndroid]);
 
   // Mobile Background Playback & MediaSession API Logic
   const silentAudioRef = useRef(null);
@@ -736,7 +739,7 @@ export default function App() {
   const shouldShowQueue = Boolean(currentSong) && !hasActiveSearchResults;
 
   useEffect(() => {
-    if (isNativeAndroid) return;
+    if (isNativeAndroid && !nativePlaybackFailed) return;
     if (backgroundAudio) {
       backgroundAudio.onended = () => playNext();
       backgroundAudio.ontimeupdate = () => setProgress(backgroundAudio.currentTime);
@@ -746,33 +749,37 @@ export default function App() {
         if (!useIframeFallback) setUseIframeFallback(true);
       };
     }
-  }, []);
+  }, [isNativeAndroid, nativePlaybackFailed]);
 
   useEffect(() => {
-    if (isNativeAndroid) return;
+    if (isNativeAndroid && !nativePlaybackFailed) return;
     if (!backgroundAudio) return;
     if (isPlaying && !useIframeFallback) {
       backgroundAudio.play().catch(e => console.error("Play failed", e));
     } else {
       backgroundAudio.pause();
     }
-  }, [isPlaying, useIframeFallback]);
+  }, [isNativeAndroid, nativePlaybackFailed, isPlaying, useIframeFallback]);
 
   useEffect(() => {
-    if (isNativeAndroid) return;
+    if (isNativeAndroid && !nativePlaybackFailed) return;
     if (backgroundAudio && currentStreamUrl && !useIframeFallback) {
       backgroundAudio.src = currentStreamUrl;
       if (isPlaying) backgroundAudio.play().catch(e => console.error("URL change play failed", e));
     }
-  }, [currentStreamUrl, useIframeFallback]);
+  }, [isNativeAndroid, nativePlaybackFailed, currentStreamUrl, useIframeFallback, isPlaying]);
 
   useEffect(() => {
     if (!isNativeAndroid || !currentSong) return;
-    if (isPlaying && currentStreamUrl) {
-      callNativePlayer('play', { url: currentStreamUrl });
-    } else if (!isPlaying) {
-      callNativePlayer('pause');
-    }
+    const runNative = async () => {
+      if (isPlaying && currentStreamUrl) {
+        const ok = await callNativePlayer('play', { url: currentStreamUrl });
+        setNativePlaybackFailed(ok === false);
+      } else if (!isPlaying) {
+        await callNativePlayer('pause');
+      }
+    };
+    runNative();
   }, [isPlaying, currentSong, currentStreamUrl, callNativePlayer]);
 
   return (
