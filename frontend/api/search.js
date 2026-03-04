@@ -8,16 +8,25 @@ export default async function handler(req, res) {
         }
 
         // Append auto/music to get better song results
-        const r = await ytSearch(query + " song audio");
-        const videos = r.videos.slice(0, 50).map(v => ({
-            id: v.videoId,
-            title: v.title,
-            artist: v.author.name,
-            duration: v.timestamp,
-            durationSeconds: v.seconds,
-            thumbnail: v.thumbnail,
-            url: v.url
-        }));
+        const r = await ytSearch(query + " official track audio");
+
+        const videos = r.videos
+            .filter(v => {
+                const title = v.title.toLowerCase();
+                const excludeKeywords = ['news', 'interview', 'collection', 'jukebox', 'mashup', 'podcast', 'episode'];
+                const hasExcludedKeyword = excludeKeywords.some(keyword => title.includes(keyword));
+                const isReasonableLength = v.seconds < 600; // Exclude videos longer than 10 minutes
+                return !hasExcludedKeyword && isReasonableLength;
+            })
+            .slice(0, 50).map(v => ({
+                id: v.videoId,
+                title: v.title,
+                artist: v.author.name,
+                duration: v.timestamp,
+                durationSeconds: v.seconds,
+                thumbnail: v.thumbnail,
+                url: v.url
+            }));
 
         res.setHeader("Access-Control-Allow-Origin", "*");
         res.setHeader("Access-Control-Allow-Headers", "Content-Type");
