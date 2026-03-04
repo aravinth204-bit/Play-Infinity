@@ -17,6 +17,8 @@ import androidx.media.session.MediaButtonReceiver;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.MediaItem;
+import com.google.android.exoplayer2.PlaybackException;
+import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.audio.AudioAttributes;
 import com.google.android.exoplayer2.ui.PlayerNotificationManager;
 
@@ -35,6 +37,8 @@ public class MusicService extends Service {
     private MediaSessionCompat mediaSession;
     private PlayerNotificationManager playerNotificationManager;
     private String currentUrl;
+    private String fallbackUrl;
+    private boolean fallbackTried;
 
     @Override
     public void onCreate() {
@@ -72,12 +76,13 @@ public class MusicService extends Service {
         }
 
         String url = intent.getStringExtra("url");
+        String newFallbackUrl = intent.getStringExtra("fallbackUrl");
+        if (newFallbackUrl != null && !newFallbackUrl.isEmpty()) {
+            fallbackUrl = newFallbackUrl;
+        }
+
         if (url != null && !url.isEmpty()) {
-            currentUrl = url;
-            MediaItem mediaItem = MediaItem.fromUri(url);
-            player.setMediaItem(mediaItem);
-            player.prepare();
-            player.play();
+            playUrl(url);
         } else if (ACTION_PLAY.equals(action)) {
             player.play();
         }
@@ -136,10 +141,38 @@ public class MusicService extends Service {
         player.setWakeMode(C.WAKE_MODE_NETWORK);
         player.setHandleAudioBecomingNoisy(true);
         player.setForegroundMode(true);
+        player.addListener(new Player.Listener() {
+            @Override
+            public void onPlayerError(PlaybackException error) {
+                if (!fallbackTried && fallbackUrl != null && !fallbackUrl.isEmpty()
+                        && (currentUrl == null || !fallbackUrl.equals(currentUrl))) {
+                    fallbackTried = true;
+                    playUrl(fallbackUrl);
+                }
+            }
+        });
     }
 
     private void initializeMediaSession() {
         mediaSession = new MediaSessionCompat(this, "PlayInfinitySession");
+        mediaSession.setCallback(new MediaSessionCompat.Callback() {
+            @Override
+            public void onPlay() {
+                player.play();
+            }
+
+            @Override
+            public void onPause() {
+                player.pause();
+            }
+
+            @Override
+            public void onStop() {
+                player.stop();
+                stopForeground(true);
+                stopSelf();
+            }
+        });
         mediaSession.setActive(true);
     }
 
@@ -222,6 +255,8 @@ public class MusicService extends Service {
         playerNotificationManager.setUseChronometer(true);
         playerNotificationManager.setUseFastForwardAction(false);
         playerNotificationManager.setUseRewindAction(false);
+        playerNotificationManager.setUseNextAction(false);
+        playerNotificationManager.setUsePreviousAction(false);
         playerNotificationManager.setPlayer(player);
     }
 
@@ -266,5 +301,14 @@ public class MusicService extends Service {
         if (manager != null) {
             manager.createNotificationChannel(channel);
         }
+    }
+
+    private void playUrl(String url) {
+        currentUrl = url;
+        fallbackTried = false;
+        MediaItem mediaItem = MediaItem.fromUri(url);
+        player.setMediaItem(mediaItem);
+        player.prepare();
+        player.play();
     }
 }

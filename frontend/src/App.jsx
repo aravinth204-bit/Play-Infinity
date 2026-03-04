@@ -772,8 +772,12 @@ export default function App() {
   useEffect(() => {
     if (!isNativeAndroid || !currentSong) return;
     const runNative = async () => {
+      const fallbackStreamUrl = `${streamEndpointBase}?videoId=${currentSong.id}`;
       if (isPlaying && currentStreamUrl) {
-        const ok = await callNativePlayer('play', { url: currentStreamUrl });
+        const ok = await callNativePlayer('play', {
+          url: currentStreamUrl,
+          fallbackUrl: fallbackStreamUrl
+        });
         setNativePlaybackFailed(ok === false);
       } else if (!isPlaying) {
         await callNativePlayer('pause');
