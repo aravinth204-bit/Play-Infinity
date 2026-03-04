@@ -647,6 +647,7 @@ export default function App() {
   playPrevRef.current = playPrev;
 
   const setupMediaSession = useCallback(() => {
+    if (isNativeAndroid) return;
     if ('mediaSession' in navigator && currentSong) {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: currentSong.title,
@@ -684,7 +685,7 @@ export default function App() {
         console.warn("MediaSession handlers failed:", e);
       }
     }
-  }, [currentSong, setIsPlaying]);
+  }, [isNativeAndroid, currentSong, setIsPlaying]);
 
   useEffect(() => {
     setUseIframeFallback(false);
@@ -692,6 +693,7 @@ export default function App() {
   }, [currentSong, setupMediaSession]);
 
   useEffect(() => {
+    if (isNativeAndroid) return;
     if (silentAudioRef.current) {
       if (isPlaying) {
         silentAudioRef.current.play().catch(() => { });
@@ -702,10 +704,11 @@ export default function App() {
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
     }
-  }, [isPlaying]);
+  }, [isNativeAndroid, isPlaying]);
 
   // Audio Context Unlock for Mobile
   useEffect(() => {
+    if (isNativeAndroid) return;
     const unlock = () => {
       if (silentAudioRef.current) {
         silentAudioRef.current.play().then(() => {
@@ -721,7 +724,7 @@ export default function App() {
       window.removeEventListener('click', unlock);
       window.removeEventListener('touchstart', unlock);
     };
-  }, []);
+  }, [isNativeAndroid]);
 
   useEffect(() => {
     if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState || !currentSong || !duration) return;
