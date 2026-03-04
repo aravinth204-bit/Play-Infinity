@@ -5,6 +5,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.pm.ServiceInfo;
 import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
@@ -29,6 +30,7 @@ public class MusicService extends Service {
     private ExoPlayer player;
     private MediaSessionCompat mediaSession;
     private PlayerNotificationManager playerNotificationManager;
+    private String currentUrl;
 
     @Override
     public void onCreate() {
@@ -41,11 +43,12 @@ public class MusicService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        startForeground(NOTIFICATION_ID, buildInitialNotification());
+        startInForeground();
 
         if (intent != null) {
             String url = intent.getStringExtra("url");
             if (url != null && !url.isEmpty()) {
+                currentUrl = url;
                 MediaItem mediaItem = MediaItem.fromUri(url);
                 player.setMediaItem(mediaItem);
                 player.prepare();
@@ -76,6 +79,20 @@ public class MusicService extends Service {
         super.onDestroy();
     }
 
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        if (player != null && player.isPlaying() && currentUrl != null && !currentUrl.isEmpty()) {
+            Intent restartIntent = new Intent(getApplicationContext(), MusicService.class);
+            restartIntent.putExtra("url", currentUrl);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(restartIntent);
+            } else {
+                startService(restartIntent);
+            }
+        }
+        super.onTaskRemoved(rootIntent);
+    }
+
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
@@ -92,6 +109,8 @@ public class MusicService extends Service {
 
         player.setAudioAttributes(audioAttributes, true);
         player.setWakeMode(C.WAKE_MODE_NETWORK);
+        player.setHandleAudioBecomingNoisy(true);
+        player.setForegroundMode(true);
     }
 
     private void initializeMediaSession() {
@@ -145,7 +164,11 @@ public class MusicService extends Service {
                     @Override
                     public void onNotificationPosted(int notificationId, Notification notification, boolean ongoing) {
                         if (ongoing) {
-                            startForeground(notificationId, notification);
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                startForeground(notificationId, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+                            } else {
+                                startForeground(notificationId, notification);
+                            }
                         } else {
                             stopForeground(false);
                         }
@@ -179,8 +202,20 @@ public class MusicService extends Service {
                 .setContentTitle("Play Infinity")
                 .setContentText("Starting playback...")
                 .setSmallIcon(android.R.drawable.ic_media_play)
+                .setCategory(NotificationCompat.CATEGORY_SERVICE)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true)
                 .build();
+    }
+
+    private void startInForeground() {
+        Notification notification = buildInitialNotification();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+        } else {
+            startForeground(NOTIFICATION_ID, notification);
+        }
     }
 
     private void createNotificationChannel() {
@@ -194,6 +229,7 @@ public class MusicService extends Service {
                 NotificationManager.IMPORTANCE_LOW
         );
         channel.setDescription("Playback controls");
+        channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
 
         NotificationManager manager = getSystemService(NotificationManager.class);
         if (manager != null) {
