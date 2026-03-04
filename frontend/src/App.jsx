@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 // Build ID: 2026-03-03-2225 (Vercel Fix)
 import ReactPlayer from 'react-player';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Home, Music, Search, User, Play, Pause, SkipBack, SkipForward, Heart, MoreHorizontal, ArrowLeft, Shuffle, Repeat, Upload, List, Headphones, Book, Download, Clock, Settings, LogOut, Bell, ChevronRight, ChevronUp, Plus, X, FolderPlus, Mic2 } from 'lucide-react';
 import { formatTime } from './utils';
 
@@ -52,6 +53,9 @@ if (backgroundAudio) {
   backgroundAudio.style.display = 'none';
   backgroundAudio.setAttribute('playsinline', 'true');
 }
+
+const MusicPlayer = registerPlugin('MusicPlayer');
+const isNativeAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 
 const DesktopSongRow = React.memo(function DesktopSongRow({
   song,
@@ -622,6 +626,15 @@ export default function App() {
   const [directStreamUrl, setDirectStreamUrl] = useState(null);
   const currentStreamUrl = directStreamUrl || (currentSong ? `${streamEndpointBase}?videoId=${currentSong.id}` : '');
 
+  const callNativePlayer = useCallback(async (method, payload = {}) => {
+    if (!isNativeAndroid || !MusicPlayer?.[method]) return;
+    try {
+      await MusicPlayer[method](payload);
+    } catch (e) {
+      console.warn(`Native player ${method} failed:`, e);
+    }
+  }, []);
+
   // Mobile Background Playback & MediaSession API Logic
   const silentAudioRef = useRef(null);
   const playNextRef = useRef(playNext);
@@ -723,6 +736,7 @@ export default function App() {
   const shouldShowQueue = Boolean(currentSong) && !hasActiveSearchResults;
 
   useEffect(() => {
+    if (isNativeAndroid) return;
     if (backgroundAudio) {
       backgroundAudio.onended = () => playNext();
       backgroundAudio.ontimeupdate = () => setProgress(backgroundAudio.currentTime);
@@ -735,6 +749,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (isNativeAndroid) return;
     if (!backgroundAudio) return;
     if (isPlaying && !useIframeFallback) {
       backgroundAudio.play().catch(e => console.error("Play failed", e));
@@ -744,11 +759,21 @@ export default function App() {
   }, [isPlaying, useIframeFallback]);
 
   useEffect(() => {
+    if (isNativeAndroid) return;
     if (backgroundAudio && currentStreamUrl && !useIframeFallback) {
       backgroundAudio.src = currentStreamUrl;
       if (isPlaying) backgroundAudio.play().catch(e => console.error("URL change play failed", e));
     }
   }, [currentStreamUrl, useIframeFallback]);
+
+  useEffect(() => {
+    if (!isNativeAndroid || !currentSong) return;
+    if (isPlaying && currentStreamUrl) {
+      callNativePlayer('play', { url: currentStreamUrl });
+    } else if (!isPlaying) {
+      callNativePlayer('pause');
+    }
+  }, [isPlaying, currentSong, currentStreamUrl, callNativePlayer]);
 
   return (
     <div className="flex items-center justify-center bg-gray-900 overflow-hidden font-['Outfit']" style={{ height: '100dvh' }}>

@@ -34,15 +34,42 @@ public class MusicPlugin extends Plugin {
         }
 
         Intent intent = new Intent(getContext(), MusicService.class);
+        intent.setAction(MusicService.ACTION_PLAY);
         intent.putExtra("url", url);
+        startMusicService(intent);
+        call.resolve();
+    }
 
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+    @PluginMethod
+    public void pause(PluginCall call) {
+        Intent intent = new Intent(getContext(), MusicService.class);
+        intent.setAction(MusicService.ACTION_PAUSE);
+        startMusicService(intent);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void resume(PluginCall call) {
+        Intent intent = new Intent(getContext(), MusicService.class);
+        intent.setAction(MusicService.ACTION_RESUME);
+        startMusicService(intent);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void stop(PluginCall call) {
+        Intent intent = new Intent(getContext(), MusicService.class);
+        intent.setAction(MusicService.ACTION_STOP);
+        startMusicService(intent);
+        call.resolve();
+    }
+
+    private void startMusicService(Intent intent) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             getContext().startForegroundService(intent);
         } else {
             getContext().startService(intent);
         }
-
-        call.resolve();
     }
 
     private void openNotificationSettings() {

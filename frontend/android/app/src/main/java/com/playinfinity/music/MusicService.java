@@ -26,6 +26,10 @@ public class MusicService extends Service {
 
     private static final String CHANNEL_ID = "music_playback_v2";
     private static final int NOTIFICATION_ID = 1;
+    public static final String ACTION_PLAY = "com.playinfinity.music.action.PLAY";
+    public static final String ACTION_PAUSE = "com.playinfinity.music.action.PAUSE";
+    public static final String ACTION_RESUME = "com.playinfinity.music.action.RESUME";
+    public static final String ACTION_STOP = "com.playinfinity.music.action.STOP";
 
     private ExoPlayer player;
     private MediaSessionCompat mediaSession;
@@ -45,19 +49,40 @@ public class MusicService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         startInForeground();
 
-        if (intent != null) {
-            String url = intent.getStringExtra("url");
-            if (url != null && !url.isEmpty()) {
-                currentUrl = url;
-                MediaItem mediaItem = MediaItem.fromUri(url);
-                player.setMediaItem(mediaItem);
-                player.prepare();
-                player.play();
-            }
-
-            MediaButtonReceiver.handleIntent(mediaSession, intent);
+        if (intent == null) {
+            return START_STICKY;
         }
 
+        String action = intent.getAction();
+        if (ACTION_PAUSE.equals(action)) {
+            player.pause();
+            return START_STICKY;
+        }
+
+        if (ACTION_RESUME.equals(action)) {
+            player.play();
+            return START_STICKY;
+        }
+
+        if (ACTION_STOP.equals(action)) {
+            player.stop();
+            stopForeground(true);
+            stopSelf();
+            return START_NOT_STICKY;
+        }
+
+        String url = intent.getStringExtra("url");
+        if (url != null && !url.isEmpty()) {
+            currentUrl = url;
+            MediaItem mediaItem = MediaItem.fromUri(url);
+            player.setMediaItem(mediaItem);
+            player.prepare();
+            player.play();
+        } else if (ACTION_PLAY.equals(action)) {
+            player.play();
+        }
+
+        MediaButtonReceiver.handleIntent(mediaSession, intent);
         return START_STICKY;
     }
 
