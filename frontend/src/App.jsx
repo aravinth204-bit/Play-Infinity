@@ -84,7 +84,7 @@ const DesktopSongRow = React.memo(function DesktopSongRow({
 });
 
 export default function App() {
-  const isNativeAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+  const [isNativeAndroid] = useState(Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android');
   const [activeTab, setActiveTab] = useState('Home');
   const [currentSong, setCurrentSong] = useState(null);
   const [useIframeFallback, setUseIframeFallback] = useState(false);
@@ -92,6 +92,30 @@ export default function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
+
+  // Listen for native playback updates
+  useEffect(() => {
+    if (!isNativeAndroid || !MusicPlayer) return;
+
+    let listener;
+    const addListener = async () => {
+      listener = await MusicPlayer.addListener('playbackStatus', (data) => {
+        if (data.position != null) setProgress(data.position);
+        if (data.duration != null && data.duration > 0) setDuration(data.duration);
+        // Sync isPlaying back to JS if changed natively (e.g. from notification)
+        if (data.isPlaying != null && data.isPlaying !== isPlaying) {
+          setIsPlaying(data.isPlaying);
+        }
+      });
+    };
+
+    addListener();
+
+    return () => {
+      if (listener) listener.remove();
+    };
+  }, [isNativeAndroid, isPlaying]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [queue, setQueue] = useState([]);

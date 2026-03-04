@@ -21,8 +21,12 @@ import com.google.android.exoplayer2.PlaybackException;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.audio.AudioAttributes;
 import com.google.android.exoplayer2.ui.PlayerNotificationManager;
+import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
+import com.google.android.exoplayer2.source.DefaultMediaSourceFactory;
+import com.google.android.exoplayer2.util.MimeTypes;
 
 import android.support.v4.media.session.MediaSessionCompat;
+import com.getcapacitor.JSObject;
 
 public class MusicService extends Service {
 
@@ -39,6 +43,16 @@ public class MusicService extends Service {
     private String currentUrl;
     private String fallbackUrl;
     private boolean fallbackTried;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable statusUpdateRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (player != null && (player.isPlaying() || player.isLoading())) {
+                sendPlaybackStatus();
+            }
+            handler.postDelayed(this, 1000);
+        }
+    };
 
     @Override
     public void onCreate() {
@@ -47,6 +61,7 @@ public class MusicService extends Service {
         initializePlayer();
         initializeMediaSession();
         initializePlayerNotificationManager();
+        handler.post(statusUpdateRunnable);
     }
 
     @Override
@@ -130,7 +145,16 @@ public class MusicService extends Service {
     }
 
     private void initializePlayer() {
-        player = new ExoPlayer.Builder(this).build();
+        DefaultHttpDataSource.Factory dataSourceFactory = new DefaultHttpDataSource.Factory()
+                .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
+                .setAllowCrossProtocolRedirects(true);
+
+        DefaultMediaSourceFactory mediaSourceFactory = new DefaultMediaSourceFactory(this)
+                .setDataSourceFactory(dataSourceFactory);
+
+        player = new ExoPlayer.Builder(this)
+                .setMediaSourceFactory(mediaSourceFactory)
+                .build();
 
         AudioAttributes audioAttributes = new AudioAttributes.Builder()
                 .setUsage(C.USAGE_MEDIA)
@@ -140,7 +164,6 @@ public class MusicService extends Service {
         player.setAudioAttributes(audioAttributes, true);
         player.setWakeMode(C.WAKE_MODE_NETWORK);
         player.setHandleAudioBecomingNoisy(true);
-        player.setForegroundMode(true);
         player.addListener(new Player.Listener() {
             @Override
             public void onPlayerError(PlaybackException error) {
@@ -150,7 +173,27 @@ public class MusicService extends Service {
                     playUrl(fallbackUrl);
                 }
             }
+
+            @Override
+            public void onPlaybackStateChanged(int playbackState) {
+                sendPlaybackStatus();
+            }
         });
+    }
+
+    private void sendPlaybackStatus() {
+        if (player == null) return;
+        
+        JSObject data = new JSObject();
+        data.put("position", player.getCurrentPosition() / 1000);
+        data.put("duration", player.getDuration() / 1000);
+        data.put("isPlaying", player.isPlaying());
+        
+        Intent intent = new Intent("com.playinfinity.music.PLAYBACK_STATUS");
+        intent.putExtra("position", (long)(player.getCurrentPosition() / 1000));
+        intent.putExtra("duration", (long)(player.getDuration() / 1000));
+        intent.putExtra("isPlaying", player.isPlaying());
+        sendBroadcast(intent);
     }
 
     private void initializeMediaSession() {
@@ -306,8 +349,14 @@ public class MusicService extends Service {
     private void playUrl(String url) {
         currentUrl = url;
         fallbackTried = false;
-        MediaItem mediaItem = MediaItem.fromUri(url);
-        player.setMediaItem(mediaItem);
+        
+        MediaItem.Builder builder = new MediaItem.Builder().setUri(url);
+        // Force MIME type for better stream detection
+        if (url.contains("googlevideo") || url.contains("piped") || url.contains("vercel")) {
+            builder.setMimeType(MimeTypes.AUDIO_MP4);
+        }
+        
+        player.setMediaItem(builder.build());
         player.prepare();
         player.play();
     }

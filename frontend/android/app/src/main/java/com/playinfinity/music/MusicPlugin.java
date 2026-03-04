@@ -7,8 +7,13 @@ import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.IntentFilter;
+
 import androidx.core.content.ContextCompat;
 
+import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -16,8 +21,35 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 @CapacitorPlugin(name = "MusicPlayer")
 public class MusicPlugin extends Plugin {
+    private BroadcastReceiver playbackStatusReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent != null && "com.playinfinity.music.PLAYBACK_STATUS".equals(intent.getAction())) {
+                JSObject status = new JSObject();
+                status.put("position", intent.getLongExtra("position", 0));
+                status.put("duration", intent.getLongExtra("duration", 0));
+                status.put("isPlaying", intent.getBooleanExtra("isPlaying", false));
+                notifyListeners("playbackStatus", status);
+            }
+        }
+    };
 
-    @PluginMethod
+    @Override
+    public void load() {
+        super.load();
+        IntentFilter filter = new IntentFilter("com.playinfinity.music.PLAYBACK_STATUS");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            getContext().registerReceiver(playbackStatusReceiver, filter, Context.RECEIVER_EXPORTED);
+        } else {
+            getContext().registerReceiver(playbackStatusReceiver, filter);
+        }
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        super.handleOnDestroy();
+        getContext().unregisterReceiver(playbackStatusReceiver);
+    }
     public void play(PluginCall call) {
         String url = call.getString("url");
         if (url == null) {
