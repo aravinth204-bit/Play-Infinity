@@ -24,7 +24,7 @@ import android.support.v4.media.session.MediaSessionCompat;
 
 public class MusicService extends Service {
 
-    private static final String CHANNEL_ID = "music_channel";
+    private static final String CHANNEL_ID = "music_playback_v2";
     private static final int NOTIFICATION_ID = 1;
 
     private ExoPlayer player;
@@ -191,6 +191,9 @@ public class MusicService extends Service {
                 .build();
 
         playerNotificationManager.setMediaSessionToken(mediaSession.getSessionToken());
+        playerNotificationManager.setSmallIcon(android.R.drawable.ic_media_play);
+        playerNotificationManager.setPriority(NotificationCompat.PRIORITY_DEFAULT);
+        playerNotificationManager.setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
         playerNotificationManager.setUseChronometer(true);
         playerNotificationManager.setUseFastForwardAction(false);
         playerNotificationManager.setUseRewindAction(false);
@@ -204,7 +207,8 @@ public class MusicService extends Service {
                 .setSmallIcon(android.R.drawable.ic_media_play)
                 .setCategory(NotificationCompat.CATEGORY_SERVICE)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setOnlyAlertOnce(true)
                 .setOngoing(true)
                 .build();
     }
@@ -226,10 +230,12 @@ public class MusicService extends Service {
         NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
                 "Music Playback",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_DEFAULT
         );
         channel.setDescription("Playback controls");
         channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+        channel.enableVibration(false);
+        channel.setShowBadge(false);
 
         NotificationManager manager = getSystemService(NotificationManager.class);
         if (manager != null) {
