@@ -24,6 +24,8 @@ import androidx.media.session.MediaButtonReceiver;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.MediaItem;
+import com.google.android.exoplayer2.DefaultLoadControl;
+import com.google.android.exoplayer2.LoadControl;
 import com.google.android.exoplayer2.PlaybackException;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.audio.AudioAttributes;
@@ -180,8 +182,19 @@ public class MusicService extends Service {
         DefaultMediaSourceFactory mediaSourceFactory = new DefaultMediaSourceFactory(this)
                 .setDataSourceFactory(dataSourceFactory);
 
+        // Fast Load Control config
+        LoadControl loadControl = new DefaultLoadControl.Builder()
+                .setBufferDurationsMs(
+                        15000, // Min Buffer
+                        50000, // Max Buffer
+                        2500,  // Buffer for Playback
+                        5000   // Buffer for Playback after Rebuffer
+                )
+                .build();
+
         player = new ExoPlayer.Builder(this)
                 .setMediaSourceFactory(mediaSourceFactory)
+                .setLoadControl(loadControl)
                 .build();
 
         AudioAttributes audioAttributes = new AudioAttributes.Builder()
@@ -381,12 +394,14 @@ public class MusicService extends Service {
         NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
                 "Music Playback",
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_HIGH
         );
         channel.setDescription("Playback controls");
         channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+        channel.setImportance(NotificationManager.IMPORTANCE_HIGH);
+        channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
         channel.enableVibration(false);
-        channel.setShowBadge(false);
+        channel.setShowBadge(true);
 
         NotificationManager manager = getSystemService(NotificationManager.class);
         if (manager != null) {

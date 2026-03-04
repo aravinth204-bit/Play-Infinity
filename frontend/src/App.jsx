@@ -552,23 +552,30 @@ export default function App() {
   ];
 
   const fetchPipedStream = async (videoId) => {
-    for (const instance of pipedInstances) {
-      try {
-        const response = await fetch(`${instance}/streams/${videoId}`);
-        if (!response.ok) continue;
-        const data = await response.json();
-        // Priority: Higher bitrate audio streams (at least 128kbps if possible)
-        const audioStreams = data.audioStreams || [];
-        const bestAudio = audioStreams
-          .filter(s => s.mimeType.includes('audio/mp4'))
-          .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0] || audioStreams[0];
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
-        if (bestAudio?.url) return bestAudio.url;
-      } catch (e) {
-        console.warn(`Piped instance ${instance} failed:`, e);
-      }
+    const fetchInstance = async (instance) => {
+      const response = await fetch(`${instance}/streams/${videoId}`, { signal: controller.signal });
+      if (!response.ok) throw new Error('Fail');
+      const data = await response.json();
+      const audioStreams = data.audioStreams || [];
+      const bestAudio = audioStreams
+        .filter(s => s.mimeType.includes('audio/mp4'))
+        .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0] || audioStreams[0];
+      if (bestAudio?.url) return bestAudio.url;
+      throw new Error('No audio');
+    };
+
+    try {
+      const result = await Promise.any(pipedInstances.map(instance => fetchInstance(instance)));
+      clearTimeout(timeoutId);
+      return result;
+    } catch (e) {
+      console.warn("All Piped instances failed or timed out", e);
+      clearTimeout(timeoutId);
+      return null;
     }
-    return null;
   };
   const playSong = async (song, fromQueue = false) => {
     setCurrentSong(song);
