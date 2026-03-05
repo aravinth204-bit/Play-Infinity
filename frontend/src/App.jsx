@@ -176,6 +176,87 @@ export default function App() {
     } catch { }
   }, []);
 
+  // ──────────────────────────────────────────────────────
+  // FEATURE: Tamil-only filter — block non-Tamil songs
+  // ──────────────────────────────────────────────────────
+  const NON_TAMIL_KEYWORDS = [
+    // Hindi indicators
+    'hindi', 'bollywood', 'hindi', 'bhojpuri', 'rajasthani', 'haryanvi', 'punjabi', 'urdu',
+    // Telugu
+    'telugu', 'tollywood', 'andhra',
+    // Malayalam
+    'malayalam', 'mollywood',
+    // Kannada
+    'kannada', 'sandalwood',
+    // General non-Tamil words that appear in song titles
+    'naa songs', 'naa oru', 'naa peru',
+  ];
+
+  const isTamilSong = (song) => {
+    const text = ((song.title || '') + ' ' + (song.artist || '') + ' ' + (song.channelTitle || '')).toLowerCase();
+    return !NON_TAMIL_KEYWORDS.some(kw => text.includes(kw));
+  };
+
+  const applyTamilFilter = (songs) => songs.filter(isTamilSong);
+
+  const applyBaseFilter = (songs) => {
+    return songs.filter(s => {
+      const t = s.title.toLowerCase();
+      return !t.includes('jukebox') && !t.includes('mashup') && !t.includes('collection') &&
+        !t.includes('nonstop') && !t.includes('full album') && !t.includes('#short') &&
+        !t.includes('status') && !t.includes('news') && !t.includes('teaser') &&
+        !t.includes('trailer') && !t.includes('karaoke') && !t.includes('whatsapp') &&
+        !t.includes('ringtone');
+    });
+  };
+
+  // ──────────────────────────────────────────────────────
+  // FEATURE: Music Director Collections
+  // ──────────────────────────────────────────────────────
+  const MUSIC_DIRECTORS = [
+    { id: 'anirudh', name: 'Anirudh', query: 'Anirudh Ravichander tamil songs audio', color: 'from-[#f97316] to-[#ef4444]', emoji: '🎸' },
+    { id: 'arrahman', name: 'A.R. Rahman', query: 'AR Rahman tamil songs audio', color: 'from-[#6366f1] to-[#8b5cf6]', emoji: '🎹' },
+    { id: 'harris', name: 'Harris Jayaraj', query: 'Harris Jayaraj tamil songs audio', color: 'from-[#0ea5e9] to-[#6366f1]', emoji: '🎻' },
+    { id: 'yuvan', name: 'Yuvan Shankar Raja', query: 'Yuvan Shankar Raja tamil songs audio', color: 'from-[#10b981] to-[#0ea5e9]', emoji: '🎵' },
+    { id: 'deva', name: 'Deva', query: 'Deva tamil songs audio', color: 'from-[#ec4899] to-[#f97316]', emoji: '🥁' },
+    { id: 'ilayaraja', name: 'Ilaiyaraaja', query: 'Ilaiyaraaja evergreen tamil songs audio', color: 'from-[#f59e0b] to-[#ec4899]', emoji: '🎼' },
+    { id: 'gv', name: 'G.V. Prakash', query: 'GV Prakash Kumar tamil songs audio', color: 'from-[#14b8a6] to-[#22c55e]', emoji: '🎤' },
+    { id: 'sid', name: 'Sid Sriram', query: 'Sid Sriram tamil songs audio', color: 'from-[#a855f7] to-[#ec4899]', emoji: '🎧' },
+  ];
+
+  const [directorSongs, setDirectorSongs] = useState([]);
+  const [selectedDirector, setSelectedDirector] = useState(null);
+  const [directorLoading, setDirectorLoading] = useState(false);
+
+  const fetchDirectorSongs = async (director) => {
+    setSelectedDirector(director);
+    setActiveTab('DirectorSongs');
+    setDirectorLoading(true);
+    setDirectorSongs([]);
+    try {
+      const cacheKey = `director_${director.id}`;
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        setDirectorSongs(JSON.parse(cached));
+        setDirectorLoading(false);
+        return;
+      }
+      const apiEndpoint = 'https://play-infinity.vercel.app/api/search';
+      const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(director.query)}`);
+      const data = await res.json();
+      let results = Array.isArray(data) ? data : (data.videos || []);
+      results = applyBaseFilter(applyTamilFilter(results));
+      sessionStorage.setItem(cacheKey, JSON.stringify(results));
+      setDirectorSongs(results);
+    } catch (err) {
+      console.error('Director songs fetch error:', err);
+    } finally {
+      setDirectorLoading(false);
+    }
+  };
+
+
+
   const getColorFromImage = (url) => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -442,11 +523,8 @@ export default function App() {
         const data = await res.json();
         let songsList = Array.isArray(data) ? data : (data.videos || []);
 
-        // Stricter filtering for trending (also block short duration like less than 60s if possible, or heavily rely on titles)
-        songsList = songsList.filter(s => {
-          const title = s.title.toLowerCase();
-          return !title.includes('jukebox') && !title.includes('collections') && !title.includes('mashup') && !title.includes('nonstop') && !title.includes('full album') && !title.includes('short') && !title.includes('whatsapp status');
-        });
+        // Strict Tamil-only filter for trending
+        songsList = applyBaseFilter(applyTamilFilter(songsList));
 
         const shuffled = songsList.sort(() => 0.5 - Math.random()).slice(0, 20);
         setTrendingSongs(shuffled);
@@ -473,11 +551,8 @@ export default function App() {
       const data = await res.json();
       let results = Array.isArray(data) ? data : (data.videos || []);
 
-      // Strict filter for single songs only, ban shorts/reels/news words
-      results = results.filter(s => {
-        const t = s.title.toLowerCase();
-        return !t.includes('jukebox') && !t.includes('mashup') && !t.includes('collection') && !t.includes('nonstop') && !t.includes('full album') && !t.includes('#short') && !t.includes('status') && !t.includes('news') && !t.includes('teaser') && !t.includes('trailer') && !t.includes('karaoke');
-      });
+      // Strict Tamil-only filter
+      results = applyBaseFilter(applyTamilFilter(results));
 
       setSongs(results);
     } catch (err) {
@@ -1165,6 +1240,28 @@ export default function App() {
                       ))}
                     </div>
 
+                    {/* 🎬 Music Directors */}
+                    <div className="mb-6">
+                      <div className="flex items-center justify-between mb-3">
+                        <h2 className="text-base font-bold text-white">🎬 Music Directors</h2>
+                        <span className="text-[10px] text-white/30 font-semibold">Tamil Only</span>
+                      </div>
+                      <div className="flex overflow-x-auto gap-3 no-scrollbar pb-2">
+                        {MUSIC_DIRECTORS.map((director) => (
+                          <button
+                            key={director.id}
+                            onClick={() => fetchDirectorSongs(director)}
+                            className="flex flex-col items-center gap-2 shrink-0 active:scale-95 transition-all"
+                          >
+                            <div className={`w-[72px] h-[72px] rounded-2xl bg-gradient-to-br ${director.color} flex items-center justify-center text-2xl shadow-lg border border-white/10`}>
+                              {director.emoji}
+                            </div>
+                            <span className="text-white text-[10px] font-bold text-center leading-tight w-[72px]">{director.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* Jump Back In */}
                     {(searchHistory.length > 0 || listenHistory.length > 0) && (
                       <div className="mb-6">
@@ -1336,6 +1433,74 @@ export default function App() {
                             <Heart size={14} fill={favoriteIds.has(song.id) ? dominantColor : 'none'} stroke={favoriteIds.has(song.id) ? dominantColor : '#6b7280'} />
                           </button>
                         </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* DIRECTOR SONGS VIEW */}
+            {activeTab === 'DirectorSongs' && selectedDirector && (
+              <div className="overflow-x-hidden min-h-screen bg-[#121212] animate-fade-in animate-slide-up-premium">
+                {/* Hero Header */}
+                <div className={`relative px-5 pt-12 pb-8 overflow-hidden`} style={{ background: `linear-gradient(160deg, ${dominantColor}55 0%, #121212 100%)` }}>
+                  <div className={`absolute inset-0 bg-gradient-to-br ${selectedDirector.color} opacity-20`} />
+                  <button onClick={() => setActiveTab('Home')} className="relative z-10 mb-5 w-9 h-9 bg-black/20 rounded-full flex items-center justify-center hover:bg-black/40 transition-all">
+                    <ArrowLeft size={18} className="text-white" />
+                  </button>
+                  <div className="relative z-10 flex items-center gap-4">
+                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${selectedDirector.color} flex items-center justify-center text-3xl shadow-2xl`}>
+                      {selectedDirector.emoji}
+                    </div>
+                    <div>
+                      <p className="text-white/50 text-[10px] uppercase tracking-widest font-bold mb-1">🎬 Music Director</p>
+                      <h1 className="text-2xl font-black text-white">{selectedDirector.name}</h1>
+                      <p className="text-white/40 text-xs mt-0.5">{directorSongs.length > 0 ? `${directorSongs.length} songs` : 'Loading...'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Song List */}
+                <div className="px-4 pb-24 space-y-1 mt-2">
+                  {directorLoading ? (
+                    [...Array(8)].map((_, i) => (
+                      <div key={i} className="flex items-center gap-3 p-2 animate-pulse">
+                        <div className="w-12 h-12 rounded-xl bg-white/10 shrink-0" />
+                        <div className="flex-1">
+                          <div className="h-3 bg-white/10 rounded-full w-3/4 mb-2" />
+                          <div className="h-2.5 bg-white/10 rounded-full w-1/2" />
+                        </div>
+                      </div>
+                    ))
+                  ) : directorSongs.length === 0 ? (
+                    <div className="text-center py-20 opacity-40">
+                      <p className="text-white font-bold text-lg">{selectedDirector.emoji}</p>
+                      <p className="text-white/60 text-sm mt-2">No songs found</p>
+                    </div>
+                  ) : (
+                    directorSongs.map((song, idx) => (
+                      <div key={`dir-${song.id}-${idx}`} onClick={() => playSong(song)} className="flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all active:scale-[0.98] active:bg-white/5 group">
+                        <div className="relative shrink-0">
+                          <img src={song.thumbnail} alt="" className="w-12 h-12 object-cover rounded-xl shadow-sm" />
+                          {currentSong?.id === song.id && isPlaying && (
+                            <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
+                              <div className="flex gap-0.5 items-end h-4">
+                                {[0, 1, 2].map(b => <div key={b} className="w-[3px] rounded-full animate-bounce" style={{ height: `${6 + b * 3}px`, backgroundColor: dominantColor, animationDelay: `${b * 0.1}s` }} />)}
+                              </div>
+                            </div>
+                          )}
+                          <div className="absolute top-1 left-1 bg-black/60 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
+                            {idx + 1}
+                          </div>
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                          <h4 className="text-white text-[13px] font-semibold truncate">{song.title}</h4>
+                          <p className="text-white/40 text-[11px] truncate mt-0.5">{song.artist}</p>
+                        </div>
+                        <button onClick={(e) => { e.stopPropagation(); toggleFavorite(e, song); }} className="p-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity active:opacity-100">
+                          <Heart size={16} fill={favoriteIds.has(song.id) ? dominantColor : 'none'} stroke={favoriteIds.has(song.id) ? dominantColor : '#6b7280'} />
+                        </button>
                       </div>
                     ))
                   )}
