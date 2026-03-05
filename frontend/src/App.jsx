@@ -643,33 +643,44 @@ export default function App() {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: currentSong.title,
         artist: currentSong.artist || 'Unknown Artist',
-        album: 'Play Infinity',
+        album: 'ISAI (இசை)',
         artwork: [
-          { src: currentSong.thumbnail, sizes: '96x96', type: 'image/jpeg' },
-          { src: currentSong.thumbnail, sizes: '128x128', type: 'image/jpeg' },
-          { src: currentSong.thumbnail, sizes: '256x256', type: 'image/jpeg' },
-          { src: currentSong.thumbnail, sizes: '512x512', type: 'image/jpeg' },
+          { src: '/logo.png', sizes: '96x96', type: 'image/png' },
+          { src: '/logo.png', sizes: '128x128', type: 'image/png' },
+          { src: '/logo.png', sizes: '256x256', type: 'image/png' },
+          { src: '/logo.png', sizes: '512x512', type: 'image/png' },
         ]
       });
 
       try {
         navigator.mediaSession.setActionHandler('play', () => {
           setIsPlaying(true);
+          if (backgroundAudio) backgroundAudio.play().catch(() => { });
           silentAudioRef.current?.play().catch(() => { });
+          navigator.mediaSession.playbackState = 'playing';
         });
+
         navigator.mediaSession.setActionHandler('pause', () => {
           setIsPlaying(false);
+          if (backgroundAudio) backgroundAudio.pause();
           silentAudioRef.current?.pause();
+          navigator.mediaSession.playbackState = 'paused';
         });
+
         navigator.mediaSession.setActionHandler('previoustrack', () => {
           if (playPrevRef.current) playPrevRef.current();
         });
+
         navigator.mediaSession.setActionHandler('nexttrack', () => {
           if (playNextRef.current) playNextRef.current();
         });
+
         navigator.mediaSession.setActionHandler('seekto', (details) => {
           if (playerRef.current) {
             playerRef.current.seekTo(details.seekTime, "seconds");
+          }
+          if (backgroundAudio) {
+            backgroundAudio.currentTime = details.seekTime;
           }
         });
       } catch (e) {
@@ -684,17 +695,20 @@ export default function App() {
   }, [currentSong, setupMediaSession]);
 
   useEffect(() => {
-    if (silentAudioRef.current) {
-      if (isPlaying) {
-        silentAudioRef.current.play().catch(() => { });
-      } else {
-        silentAudioRef.current.pause();
-      }
-    }
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
     }
-  }, [isPlaying]);
+    // Update native audio directly to bypass React cycle in background
+    if (backgroundAudio) {
+      if (isPlaying && !useIframeFallback) {
+        backgroundAudio.play().catch(() => { });
+        if (silentAudioRef.current) silentAudioRef.current.play().catch(() => { });
+      } else {
+        backgroundAudio.pause();
+        if (silentAudioRef.current) silentAudioRef.current.pause();
+      }
+    }
+  }, [isPlaying, useIframeFallback]);
 
   // Audio Context Unlock for Mobile
   useEffect(() => {
@@ -730,6 +744,7 @@ export default function App() {
   const hasActiveSearchResults = searchQuery.trim().length > 0 && songs.length > 0;
   const shouldShowQueue = Boolean(currentSong) && !hasActiveSearchResults;
 
+  // backgroundAudio setup and event handlers
   useEffect(() => {
     if (backgroundAudio) {
       backgroundAudio.onended = () => playNext();
@@ -740,16 +755,7 @@ export default function App() {
         if (!useIframeFallback) setUseIframeFallback(true);
       };
     }
-  }, []);
-
-  useEffect(() => {
-    if (!backgroundAudio) return;
-    if (isPlaying && !useIframeFallback) {
-      backgroundAudio.play().catch(e => console.error("Play failed", e));
-    } else {
-      backgroundAudio.pause();
-    }
-  }, [isPlaying, useIframeFallback]);
+  }, [playNext, useIframeFallback]);
 
   useEffect(() => {
     if (backgroundAudio && currentStreamUrl && !useIframeFallback) {
@@ -803,15 +809,25 @@ export default function App() {
             {activeTab === 'Home' && (
               <div className="p-4 pt-10 overflow-x-hidden" style={{ background: 'linear-gradient(to bottom, #1e1e1e 0%, #121212 250px)' }}>
                 {/* Top Header */}
-                <div className="flex items-center gap-3 mb-6 relative z-10">
-                  <div onClick={() => setActiveTab('Search')} className="w-8 h-8 rounded-full bg-[#f8a4bc] text-black flex items-center justify-center font-bold text-sm shrink-0 shadow-md">
-                    A
+                <div className="flex items-center justify-between mb-8 relative z-10 px-1 pt-2">
+                  <div className="flex items-center gap-3">
+                    <img src="/logo.png" alt="Logo" className="w-10 h-10 rounded-xl shadow-lg shadow-[#8cd92b]/20 shrink-0" />
+                    <span className="text-white text-2xl font-black tracking-tighter italic">ISAI </span>
                   </div>
-                  <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
-                    <button className="px-4 py-1.5 bg-[#1ed760] text-black rounded-full text-sm font-semibold shrink-0">All</button>
-                    <button className="px-4 py-1.5 bg-[#2a2a2a] text-white rounded-full text-sm font-medium shrink-0 hover:bg-[#3e3e3e]">Music</button>
-                    <button className="px-4 py-1.5 bg-[#2a2a2a] text-white rounded-full text-sm font-medium shrink-0 hover:bg-[#3e3e3e]">Podcasts</button>
+                  <div className="flex gap-2">
+                    <button onClick={() => setActiveTab('Search')} className="p-2.5 bg-[#2a2a2a] text-white rounded-full hover:bg-[#3e3e3e] transition-colors shadow-sm">
+                      <Search size={22} />
+                    </button>
+                    <button className="p-2.5 bg-[#2a2a2a] text-white rounded-full hover:bg-[#3e3e3e] transition-colors shadow-sm">
+                      <Settings size={22} />
+                    </button>
                   </div>
+                </div>
+
+                <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 mb-6 relative z-10">
+                  <button className="px-5 py-1.5 bg-[#1ed760] text-black rounded-full text-sm font-bold shrink-0">All</button>
+                  <button className="px-5 py-1.5 bg-[#2a2a2a] text-white rounded-full text-sm font-semibold shrink-0 hover:bg-[#3e3e3e]">Music</button>
+                  <button className="px-5 py-1.5 bg-[#2a2a2a] text-white rounded-full text-sm font-semibold shrink-0 hover:bg-[#3e3e3e]">Podcasts</button>
                 </div>
 
                 {/* Grid Section */}
@@ -838,7 +854,7 @@ export default function App() {
                       <div className="relative w-[120px] h-[120px] mb-3">
                         <img src={song.thumbnail} alt="" className="w-full h-full object-cover rounded-md shadow-[0_8px_24px_rgba(0,0,0,0.5)] bg-[#262837]" />
                         <div className="absolute top-2 left-2 text-[#8cd92b]">
-                          <img src="/logo.jpg" className="w-5 h-5 rounded-full object-cover" alt="icon" />
+                          <img src="/logo.png" className="w-5 h-5 rounded-md object-cover shadow-sm bg-black/50" alt="icon" />
                         </div>
                       </div>
                       <span className="text-white text-[12px] font-semibold truncate">{song.title}</span>
@@ -996,7 +1012,7 @@ export default function App() {
             {currentSong ? (
               <div className="flex-1 flex flex-col items-center px-6 relative z-10 w-full overflow-y-auto no-scrollbar pb-24">
                 {/* Album Art Square Banner with Equalizer Overlay */}
-                <div className={`mt-6 mb-2 w-[min(310px,75vw)] aspect-square relative mx-auto rounded-3xl overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.7)] bg-[#1a1c2a] shrink-0 border border-[#ffffff0a] transition-all duration-1000 ${isPlaying ? 'animate-slow-pulse scale-[1.02]' : 'scale-100'}`}>
+                <div className={`mt-2 mb-2 w-[min(310px,75vw)] aspect-square relative mx-auto rounded-3xl overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.7)] bg-[#1a1c2a] shrink-0 border border-[#ffffff0a] transition-all duration-1000 ${isPlaying ? 'animate-slow-pulse scale-[1.02]' : 'scale-100'}`}>
                   <img
                     src={currentSong.thumbnail}
                     alt="Cover"
@@ -1239,9 +1255,12 @@ export default function App() {
       <div className="hidden md:flex w-full max-w-[1200px] h-[850px] max-h-[90vh] bg-[#121422] rounded-[36px] shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden text-[#a0a3b1]">
         {/* Left Sidebar */}
         <div className="w-64 bg-[#1a1c2a] flex flex-col pt-10 pb-8 px-8 border-r border-[#262837] shrink-0 z-10">
-          <h1 className="text-2xl font-bold mb-10 text-white flex items-center gap-3">
-            <img src="/logo.jpg" alt="Play Infinity" className="h-10 w-10 object-cover rounded-full" />
-            <span className="text-[#8cd92b] tracking-wider text-xl">Play Infinity v2.2</span>
+          <h1 className="text-2xl font-bold mb-10 text-white flex items-center gap-4 px-1">
+            <img src="/logo.png" alt="Isai" className="h-12 w-12 object-cover rounded-2xl shadow-xl shadow-[#8cd92b]/20" />
+            <div className="flex flex-col">
+              <span className="text-white tracking-tighter text-3xl font-black italic -mb-1">ISAI</span>
+              {/* <span className="text-[#8cd92b] text-sm font-bold tracking-widest lowercase opacity-80 pl-1">இசை player</span> */}
+            </div>
           </h1>
           <nav className="flex-1 space-y-5 overflow-y-auto no-scrollbar">
             <div className="flex items-center gap-4 text-white font-semibold cursor-pointer border-l-2 border-[#8cd92b] pl-2 -ml-2.5">

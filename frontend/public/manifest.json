@@ -1,22 +1,22 @@
 {
-    "name": "Play Infinity Music",
-    "short_name": "Play Infinity",
+    "name": "ISAI - இசை Player",
+    "short_name": "ISAI",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#121422",
+    "background_color": "#121212",
     "theme_color": "#8cd92b",
-    "description": "Listen to your favorite music anywhere",
+    "description": "Premium Tamil Music Streaming",
     "icons": [
         {
-            "src": "logo.jpg",
+            "src": "logo.png",
             "sizes": "192x192",
-            "type": "image/jpeg",
+            "type": "image/png",
             "purpose": "any maskable"
         },
         {
-            "src": "logo.jpg",
+            "src": "logo.png",
             "sizes": "512x512",
-            "type": "image/jpeg"
+            "type": "image/png"
         }
     ]
 }
