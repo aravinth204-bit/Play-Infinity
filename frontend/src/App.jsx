@@ -1127,7 +1127,7 @@ export default function App() {
                           {isPlaying && (
                             <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center">
                               <div className="flex gap-[3px] items-end h-5">
-                                {[0,1,2,3].map(b => <div key={b} className="w-[3px] rounded-full bg-[#8cd92b]" style={{ height: `${6 + Math.sin(Date.now()/200 + b) * 6}px`, animation: `bounce ${0.4 + b*0.1}s ease-in-out infinite alternate` }} />)}
+                                {[0, 1, 2, 3].map(b => <div key={b} className="w-[3px] rounded-full bg-[#8cd92b]" style={{ height: `${6 + Math.sin(Date.now() / 200 + b) * 6}px`, animation: `bounce ${0.4 + b * 0.1}s ease-in-out infinite alternate` }} />)}
                               </div>
                             </div>
                           )}
@@ -1255,7 +1255,7 @@ export default function App() {
                               {currentSong?.id === song.id && isPlaying && (
                                 <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
                                   <div className="flex gap-0.5 items-end h-4">
-                                    {[0,1,2].map(b => <div key={b} className="w-[3px] rounded-full animate-bounce" style={{ height: `${6+b*3}px`, backgroundColor: dominantColor, animationDelay: `${b*0.1}s` }} />)}
+                                    {[0, 1, 2].map(b => <div key={b} className="w-[3px] rounded-full animate-bounce" style={{ height: `${6 + b * 3}px`, backgroundColor: dominantColor, animationDelay: `${b * 0.1}s` }} />)}
                                   </div>
                                 </div>
                               )}
@@ -1290,6 +1290,55 @@ export default function App() {
                   {favorites.length > 0 ? favorites.map((song, idx) => (
                     <DesktopSongRow key={song.id} song={song} onSelect={() => playSong(song)} isFavorite={true} onToggleFavorite={(e) => toggleFavorite(e, song)} />
                   )) : <p className="text-center py-20 text-gray-500">No liked songs yet.</p>}
+                </div>
+              </div>
+            )}
+
+            {/* LISTEN HISTORY VIEW */}
+            {activeTab === 'History' && (
+              <div className="overflow-x-hidden min-h-screen bg-[#121212] animate-fade-in animate-slide-up-premium">
+                <div className="px-5 pt-12 pb-6" style={{ background: `linear-gradient(to bottom, ${dominantColor}55 0%, #121212 100%)` }}>
+                  <button onClick={() => setActiveTab('Home')} className="mb-4 w-9 h-9 bg-black/20 rounded-full flex items-center justify-center hover:bg-black/30 transition-all">
+                    <ArrowLeft size={18} className="text-white" />
+                  </button>
+                  <h1 className="text-3xl font-bold text-white">Recently Played</h1>
+                  <p className="text-sm text-white/50 mt-1 font-medium">{listenHistory.length} songs</p>
+                </div>
+                <div className="px-4 pb-24 space-y-1">
+                  {listenHistory.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center pt-20 text-center opacity-40">
+                      <History size={48} className="mb-4 text-gray-500" />
+                      <p className="text-white font-bold">No history yet</p>
+                      <p className="text-gray-500 text-sm mt-1">Play a song to see it here</p>
+                    </div>
+                  ) : (
+                    listenHistory.map((song, idx) => (
+                      <div key={`${song.id}-${idx}`} onClick={() => playSong(song)} className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-xl cursor-pointer transition-all active:scale-[0.98]">
+                        <div className="relative shrink-0">
+                          <img src={song.thumbnail} alt="" className="w-12 h-12 object-cover rounded-xl shadow-sm" />
+                          {currentSong?.id === song.id && isPlaying && (
+                            <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
+                              <div className="flex gap-0.5 items-end h-4">
+                                {[0, 1, 2].map(b => <div key={b} className="w-[3px] rounded-full animate-bounce" style={{ height: `${6 + b * 4}px`, backgroundColor: dominantColor, animationDelay: `${b * 0.1}s` }} />)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                          <h4 className="font-semibold text-white text-[14px] truncate">{song.title}</h4>
+                          <p className="text-[12px] text-[#a0a0a0] truncate mt-0.5">{song.artist}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <p className="text-[10px] text-gray-600">
+                            {song.playedAt ? new Date(song.playedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                          </p>
+                          <button onClick={(e) => { e.stopPropagation(); toggleFavorite(e, song); }} className="p-1.5">
+                            <Heart size={14} fill={favoriteIds.has(song.id) ? dominantColor : 'none'} stroke={favoriteIds.has(song.id) ? dominantColor : '#6b7280'} />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -1419,50 +1468,6 @@ export default function App() {
                 </div>
               </div>
             )}
-          </div>
-        )}
-
-        {/* LISTEN HISTORY VIEW */}
-        {activeTab === 'History' && (
-          <div className="flex flex-col flex-1 overflow-hidden animate-fade-in">
-            <div className="px-5 pt-12 pb-6" style={{ background: `linear-gradient(to bottom, ${dominantColor}44 0%, #121212 100%)` }}>
-              <button onClick={() => setActiveTab('Home')} className="mb-4 w-8 h-8 bg-black/20 rounded-full flex items-center justify-center">
-                <ArrowLeft size={18} className="text-white" />
-              </button>
-              <h1 className="text-3xl font-bold text-white">Recently Played</h1>
-              <p className="text-sm text-white/60 mt-1">{listenHistory.length} songs</p>
-            </div>
-            <div className="flex-1 overflow-y-auto no-scrollbar pb-24 px-4 space-y-1">
-              {listenHistory.length === 0 ? (
-                <div className="flex flex-col items-center justify-center pt-20 text-center opacity-40">
-                  <History size={48} className="mb-4 text-gray-500" />
-                  <p className="text-white font-bold">No history yet</p>
-                  <p className="text-gray-500 text-sm mt-1">Play a song to see it here</p>
-                </div>
-              ) : (
-                listenHistory.map((song, idx) => (
-                  <div key={`${song.id}-${idx}`} onClick={() => playSong(song)} className="flex items-center gap-3 p-2 hover:bg-[#ffffff0a] rounded-md cursor-pointer transition-all active:scale-[0.98]">
-                    <div className="relative shrink-0">
-                      <img src={song.thumbnail} alt="" className="w-12 h-12 object-cover rounded-md shadow-sm" />
-                      {currentSong?.id === song.id && isPlaying && (
-                        <div className="absolute inset-0 bg-black/50 rounded-md flex items-center justify-center">
-                          <div className="flex gap-0.5 items-end h-4">
-                            {[0, 1, 2].map(b => <div key={b} className="w-1 rounded-full animate-bounce bg-[#8cd92b]" style={{ height: `${8 + b * 4}px`, animationDelay: `${b * 0.1}s` }} />)}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 overflow-hidden">
-                      <h4 className="font-semibold text-white text-[14px] truncate">{song.title}</h4>
-                      <p className="text-[12px] text-[#a0a0a0] truncate mt-0.5">{song.artist}</p>
-                    </div>
-                    <p className="text-[10px] text-gray-600 shrink-0">
-                      {song.playedAt ? new Date(song.playedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
           </div>
         )}
 
