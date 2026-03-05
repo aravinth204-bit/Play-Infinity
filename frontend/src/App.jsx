@@ -200,16 +200,19 @@ export default function App() {
   const applyTamilFilter = (songs) => songs.filter(isTamilSong);
 
   const applyBaseFilter = (songs) => {
+    const BLOCKED = [
+      'jukebox', 'mashup', 'collection', 'nonstop', 'full album', 'short',
+      'reels', 'reel', 'status', 'news', 'teaser', 'trailer', 'karaoke',
+      'whatsapp', 'ringtone', '8d', 'interview', 'podcast', 'reaction',
+      'cover', 'promo', 'making of', 'behind the scenes', 'top 10', 'top 50',
+      'best of', 'all songs', 'hit list', 'audio jukebox', 'songs list'
+    ];
     return songs.filter(s => {
-      const t = s.title.toLowerCase();
-      return !t.includes('jukebox') && !t.includes('mashup') && !t.includes('collection') &&
-        !t.includes('nonstop') && !t.includes('full album') && !t.includes('short') &&
-        !t.includes('reels') && !t.includes('status') && !t.includes('news') &&
-        !t.includes('teaser') && !t.includes('trailer') && !t.includes('karaoke') &&
-        !t.includes('whatsapp') && !t.includes('ringtone') && !t.includes('8d') &&
-        !t.includes('interview') && !t.includes('podcast');
+      const t = (s.title || '').toLowerCase();
+      return !BLOCKED.some(kw => t.includes(kw));
     });
   };
+
 
   // ──────────────────────────────────────────────────────
   // FEATURE: Music Director Collections
@@ -228,11 +231,46 @@ export default function App() {
   // ──────────────────────────────────────────────────────
   // FEATURE: Era Collections (80s, 90s, 2k)
   // ──────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────
+  // ERA COLLECTION QUERIES — curated Tamil-only, no reels/shorts/other languages
+  // Trending Now  : 2024-2025 popular Tamil film songs
+  // 2K Kids       : Tamil movies released after 2015
+  // 90s Hits      : Tamil songs 1990–2014
+  // 80s Classics  : Tamil songs before 1990
+  // ──────────────────────────────────────────────────────
   const ERA_COLLECTIONS = [
-    { id: '2024 hits', name: 'Trending Now', query: 'latest tamil hit songs 2024 -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#ff007f] to-[#ff7f00]', emoji: '🔥', subtitle: 'Current Hits' },
-    { id: '2k', name: '2k Kids', query: '2000s tamil hit songs evergreen -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#00f2fe] to-[#4facfe]', emoji: '🎧', subtitle: 'Nostalgia' },
-    { id: '90s', name: '90s Hits', query: '90s tamil hit songs evergreen -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#f6d365] to-[#fda085]', emoji: '📼', subtitle: 'Golden Era' },
-    { id: '80s', name: '80s Classics', query: '80s tamil hit songs evergreen -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#d4fc79] to-[#96e6a1]', emoji: '📻', subtitle: 'Retro Classics' },
+    {
+      id: 'trending_now',
+      name: 'Trending Now',
+      query: 'tamil songs 2024 2025 Anirudh GV Prakash Yuvan trending hit -jukebox -mashup -nonstop -shorts -reels -status -interview -teaser -trailer -ringtone',
+      color: 'from-[#ff007f] to-[#ff7f00]',
+      emoji: '🔥',
+      subtitle: 'Current Hits'
+    },
+    {
+      id: '2k_kids',
+      name: '2K Kids',
+      query: 'tamil hit songs 2016 2017 2018 2019 2020 2021 2022 2023 Mersal Bigil Master Beast Vikram Jailer -jukebox -mashup -nonstop -shorts -reels -status -interview -teaser -trailer -ringtone',
+      color: 'from-[#00f2fe] to-[#4facfe]',
+      emoji: '🎧',
+      subtitle: 'After 2015'
+    },
+    {
+      id: '90s_hits',
+      name: '90s Hits',
+      query: 'tamil evergreen songs 1990s 2000s Roja Bombay Kadhal Desam Gentleman Kadhalan Muthu Enthiran -jukebox -mashup -nonstop -shorts -reels -status -interview -teaser -trailer -ringtone',
+      color: 'from-[#f6d365] to-[#fda085]',
+      emoji: '📼',
+      subtitle: '1990 – 2015'
+    },
+    {
+      id: '80s_classics',
+      name: '80s Classics',
+      query: 'tamil classic songs Ilaiyaraaja 1980s Moodu Pani Ninaithale Innikkum Ninaive Oru Sangeetham Punnagai Mannan Agni Natchathiram -jukebox -mashup -nonstop -shorts -reels -status -interview -teaser -trailer -ringtone',
+      color: 'from-[#d4fc79] to-[#96e6a1]',
+      emoji: '📻',
+      subtitle: 'Before 1990'
+    },
   ];
 
   const [directorSongs, setDirectorSongs] = useState([]);
@@ -523,26 +561,26 @@ export default function App() {
   useEffect(() => {
     const fetchTrending = async () => {
       try {
-        const cached = sessionStorage.getItem('trendingSongs');
+        const cached = sessionStorage.getItem('trendingSongs_v2');
         if (cached) {
           setTrendingSongs(JSON.parse(cached));
           return;
         }
         const apiEndpoint = `https://play-infinity.vercel.app/api/search`;
-        // Search for Tamil audio songs
-        const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent('tamil hit songs audio')}`);
+        // Fetch actual 2024-2025 trending Tamil film songs — strict exclusions
+        const trendingQuery = 'trending tamil songs 2024 2025 Anirudh Yuvan GV Prakash Sid Sriram -jukebox -mashup -nonstop -shorts -reels -status -interview -teaser -trailer -ringtone -whatsapp';
+        const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(trendingQuery)}`);
         const data = await res.json();
         let songsList = Array.isArray(data) ? data : (data.videos || []);
 
-        // Strict Tamil-only filter for trending
+        // Strict Tamil-only + base quality filter
         songsList = applyBaseFilter(applyTamilFilter(songsList));
 
         const shuffled = songsList.sort(() => 0.5 - Math.random()).slice(0, 20);
         setTrendingSongs(shuffled);
-        sessionStorage.setItem('trendingSongs', JSON.stringify(shuffled));
+        sessionStorage.setItem('trendingSongs_v2', JSON.stringify(shuffled));
       } catch (err) {
         console.error("Fetch trending error:", err);
-        // Show error for debugging in development/APK
         if (window.location.protocol.startsWith('http')) {
           console.log("Trending failed:", err.message);
         }
