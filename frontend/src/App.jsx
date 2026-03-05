@@ -732,193 +732,150 @@ export default function App() {
   const fetchQueue = async (song) => {
     setIsFetchingQueue(true);
     try {
-      const minQueueTarget = 20;
       const apiEndpoint = `https://play-infinity.vercel.app/api/search`;
-      const currentSongTitle = song.title || '';
-
-      const titleLower = song.title.toLowerCase();
+      const currentSongTitle = (song.title || '').toLowerCase();
       const searchLower = searchQuery.toLowerCase();
+      const combinedText = `${currentSongTitle} ${searchLower}`;
 
-      // Vibe keyword detection
-      const kuthuKeywords = ["kuthu", "dance", "mass", "folk", "fast", "dappankuthu", "seena thana", "appadi podu", "kalyana vayasu", "vaathi coming", "aaluma doluma", "verithanam", "machi open the bottle", "nakku mukka", "sodakku", "rowdy baby", "kutti story"];
-      const melodyKeywords = ["love", "kadhal", "melody", "romantic", "bgm", "po nee po", "munbe vaa", "hosanna", "nenjukkul", "vaseegara", "minnale", "ilayaraja", "ar rahman", "thamarai", "kurumugil"];
-      const sadKeywords = ["sad", "sogam", "pain", "broken", "kanneer", "feeling", "lonely"];
+      // ── MOOD / VIBE DETECTION ───────────────────────────────────────────
+      const kuthuWords = ['kuthu', 'dance', 'mass', 'folk', 'fast', 'dappankuthu', 'vaathi', 'verithanam', 'rowdy', 'aaluma', 'nakku', 'seena', 'appadi', 'boss', 'billa', 'villain', 'thala', 'thalapathy', 'rajini', 'rajinikanth', 'beast mode', 'goat'];
+      const loveWords = ['love', 'kadhal', 'romance', 'romantic', 'nee', 'yen', 'un', 'vaseegara', 'hosanna', 'munbe', 'minnale', 'kanave', 'kannam', 'kaadhal', 'priya', 'penne', 'love song', 'melody love', 'mannipaaya', 'yennai'];
+      const sadWords = ['sad', 'sogam', 'pain', 'broken', 'lonely', 'kanneer', 'feeling', 'missing', 'thirumbi', 'ninaivugal', 'oru naal', 'life', 'vaazhkai', 'irukkindren', 'illaiyae'];
+      const newWords = ['2024', '2025', '2023', 'new', 'latest', 'trending', 'recent', 'anirudh', 'gv prakash', 'sid sriram', 'beast', 'jailer', 'leo', 'amaran', 'vidaamuyarchi', 'goat'];
+      const oldWords = ['80s', '90s', 'classic', 'evergreen', 'ilayaraja', 'ilaiyaraaja', 'spb', 'janaki', 'swarnalatha', 'old', 'golden', 'roja', 'bombay', 'mani ratnam', 'rajkumar', 'sivaji'];
+      const devotionalWords = ['devotional', 'bhakti', 'murugan', 'amman', 'vinayagar', 'ayyappan', 'suprabhatam', 'kovil', 'god', 'prayer'];
 
-      let moodQuery = "";
+      const matches = (words) => words.some(w => combinedText.includes(w));
 
-      if (kuthuKeywords.some(w => searchLower.includes(w) || titleLower.includes(w))) {
-        moodQuery = "tamil mass kuthu audio songs -jukebox";
-      } else if (melodyKeywords.some(w => searchLower.includes(w) || titleLower.includes(w))) {
-        moodQuery = "tamil melody love romantic audio songs -jukebox";
-      } else if (sadKeywords.some(w => searchLower.includes(w) || titleLower.includes(w))) {
-        moodQuery = "tamil sad feelings audio songs -jukebox";
+      // Extract artist name (clean up YouTube artifacts)
+      const rawArtist = (song.artist || '').replace(/ - topic|vevo|official|music/gi, '').split(',')[0].trim();
+      const artist = rawArtist.length > 2 && rawArtist.toLowerCase() !== 'various artists' ? rawArtist : '';
+
+      // ── BUILD QUERY LIST BASED ON DETECTED MOOD ─────────────────────────
+      let queryList = [];
+
+      if (matches(devotionalWords)) {
+        queryList = [
+          'tamil devotional songs Murugan Amman audio',
+          'SPB tamil devotional songs audio',
+          'tamil god songs Ayyappan Vinayagar audio',
+          'Veeramanidaasan devotional tamil songs',
+        ];
+      } else if (matches(sadWords)) {
+        queryList = [
+          'tamil sad melody songs audio',
+          'tamil feeling songs broken heart audio',
+          'Harris Jayaraj sad melody tamil songs',
+          'Yuvan Shankar Raja sad songs tamil audio',
+          'AR Rahman emotional tamil songs audio',
+        ];
+      } else if (matches(loveWords)) {
+        queryList = [
+          'tamil love melody romantic songs audio',
+          'Sid Sriram tamil love songs audio',
+          'AR Rahman romantic tamil songs audio',
+          'Harris Jayaraj love melody tamil songs',
+          'tamil kadhal melody songs Yuvan audio',
+        ];
+      } else if (matches(kuthuWords)) {
+        queryList = [
+          'tamil mass kuthu dance songs audio',
+          'Anirudh mass beat tamil songs audio',
+          'tamil folk kuthu songs audio',
+          'Devi Sri Prasad kuthu tamil songs audio',
+          'tamil party songs mass audio',
+        ];
+      } else if (matches(oldWords)) {
+        queryList = [
+          'Ilaiyaraaja evergreen 80s 90s tamil songs audio',
+          'SPB Janaki classic tamil melody songs',
+          'AR Rahman 90s Mani Ratnam tamil songs audio',
+          'Swarnalatha classic tamil songs audio',
+          'Deva classic Tamil hit songs audio',
+        ];
+      } else if (matches(newWords)) {
+        queryList = [
+          'Anirudh 2024 2025 tamil songs audio',
+          'Sid Sriram GV Prakash new tamil songs',
+          'Yuvan Anirudh latest tamil hit songs audio',
+          'Vijay Ajith 2024 tamil movie songs audio',
+          'new tamil songs 2025 trending audio',
+        ];
       } else {
-        let artist = song.artist?.replace(/ - Topic|VEVO/gi, '').split(',')[0].trim();
-        if (artist && artist.toLowerCase() !== 'various artists' && artist.length > 2) {
-          moodQuery = `${artist} tamil audio songs -jukebox`;
-        } else {
-          const fallbacks = [
-            "tamil mass kuthu audio songs -jukebox",
-            "tamil melody love romantic audio songs -jukebox",
-            "tamil latest hit audio songs -jukebox"
-          ];
-          moodQuery = fallbacks[Math.floor(Math.random() * fallbacks.length)];
-        }
-      }
-
-      const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(moodQuery)}`);
-      let data = await res.json();
-      if (!Array.isArray(data)) {
-        data = data.videos || [];
-      }
-
-      const getSignificantWords = (str) => {
-        return str.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(' ')
-          .filter(w => w.length > 3 && !['lyric', 'video', 'audio', 'song', 'songs', 'tamil', 'official', 'full', 'theme', 'topic'].includes(w));
-      };
-
-      const currentWords = getSignificantWords(song.title);
-
-      let newQueue = [];
-      if (data && data.length > 0) {
-        const filteredQueue = data.filter(s => {
-          if (s.id === song.id) return false;
-          if (s.durationSeconds && s.durationSeconds > 420) return false;
-          if (s.durationSeconds && s.durationSeconds < 90) return false;
-          if (isLikelySameSong(s.title, currentSongTitle)) return false;
-
-          const lowerTitle = s.title.toLowerCase();
-          const badWords = ["jukebox", "mashup", "collections", "nonstop", "full album", "news", "interview", "podcast", "vlog", "speech", "review", "reaction", "trailer", "teaser", "promo", "audio launch", "press", "telugu", "hindi", "malayalam", "kannada", "whatsapp status"];
-          for (let word of badWords) {
-            if (lowerTitle.includes(word)) return false;
-          }
-
-          const sWords = getSignificantWords(s.title);
-          let matchCount = 0;
-          for (let w of currentWords) {
-            if (sWords.includes(w)) matchCount++;
-          }
-
-          if (matchCount >= 2) return false;
-          if (currentWords.length === 1 && matchCount === 1) return false;
-          return true;
-        });
-
-        const relaxedPool = data
-          .filter(s => s.id !== song.id && (s.durationSeconds == null || s.durationSeconds < 420))
-          .filter(s => !s.durationSeconds || s.durationSeconds >= 90)
-          .filter(s => !isLikelySameSong(s.title, currentSongTitle))
-          .sort(() => 0.5 - Math.random());
-
-        const merged = [
-          ...filteredQueue,
-          ...relaxedPool.filter(s => !filteredQueue.some(f => f.id === s.id))
+        // Context-based: use artist + song title words
+        const titleWords = currentSongTitle.replace(/[^a-z0-9 ]/g, ' ').split(' ').filter(w => w.length > 3 && !['song', 'songs', 'audio', 'video', 'tamil', 'official', 'full', 'lyrics'].includes(w)).slice(0, 2).join(' ');
+        queryList = [
+          artist ? `${artist} tamil songs audio` : 'tamil hit songs audio',
+          titleWords ? `${titleWords} tamil songs audio` : 'tamil melody songs audio',
+          'Anirudh Yuvan tamil hit songs audio',
+          'AR Rahman Harris Jayaraj tamil songs audio',
+          'tamil love melody mass songs audio',
         ];
-
-        newQueue = merged.slice(0, 40);
       }
 
-      if (newQueue.length === 0) {
-        const fallbacks = [...songs, ...searchHistory, ...trendingSongs].filter(s => s.id !== song.id);
-        const uniqueFallbacks = Array.from(new Map(fallbacks.map(item => [item.id, item])).values());
-        newQueue = uniqueFallbacks.sort(() => 0.5 - Math.random()).slice(0, 30);
+      // ── PARALLEL FETCH ALL QUERIES ───────────────────────────────────────
+      const fetchResults = await Promise.allSettled(
+        queryList.map(q =>
+          fetch(`${apiEndpoint}?q=${encodeURIComponent(q)}`)
+            .then(r => r.json())
+            .then(d => Array.isArray(d) ? d : (d.videos || []))
+            .catch(() => [])
+        )
+      );
+
+      // Flatten
+      let rawPool = fetchResults.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+
+      // ── FILTER & DEDUPLICATE ─────────────────────────────────────────────
+      // Apply Tamil + base quality filter first
+      rawPool = applyBaseFilter(applyTamilFilter(rawPool));
+
+      // Deduplicate by ID + normalized title
+      const seenIds = new Set([song.id]);
+      if (currentSong) seenIds.add(currentSong.id);
+      sessionPlayedIds.current.forEach(id => seenIds.add(id));
+
+      const seenTitleKeys = new Set();
+      seenTitleKeys.add((song.title || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30));
+
+      const deduped = [];
+      for (const s of rawPool) {
+        if (!s || !s.id) continue;
+        if (seenIds.has(s.id)) continue;
+        // Duration guard: skip very short (<90s) or very long (>7min) tracks
+        if (s.durationSeconds && s.durationSeconds < 90) continue;
+        if (s.durationSeconds && s.durationSeconds > 480) continue;
+        const titleKey = (s.title || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30);
+        if (seenTitleKeys.has(titleKey)) continue;
+        // Skip if title too similar to current song
+        if (isLikelySameSong(s.title, song.title)) continue;
+        seenIds.add(s.id);
+        seenTitleKeys.add(titleKey);
+        deduped.push(s);
       }
 
-      if (newQueue.length < minQueueTarget) {
-        const extraFallbacks = [...songs, ...searchHistory, ...trendingSongs].filter(s => s.id !== song.id);
-        const uniqueExtras = Array.from(new Map(extraFallbacks.map(item => [item.id, item])).values());
-        const missing = uniqueExtras
-          .filter(s => !newQueue.some(q => q.id === s.id))
-          .filter(s => !isLikelySameSong(s.title, currentSongTitle));
-        newQueue = [...newQueue, ...missing].slice(0, 40);
-      }
+      // Shuffle for variety, cap at 40
+      const finalQueue = deduped.sort(() => 0.5 - Math.random()).slice(0, 40);
 
-      if (newQueue.length < minQueueTarget) {
-        try {
-          const topUpRes = await fetch(`${apiEndpoint}?q=${encodeURIComponent('tamil trending latest hit video songs')}`);
-          let topUpData = await topUpRes.json();
-          if (!Array.isArray(topUpData)) topUpData = topUpData.videos || [];
-          const cleanTopUp = topUpData
-            .filter(s => s.id !== song.id && (s.durationSeconds == null || s.durationSeconds < 420))
-            .filter(s => !s.durationSeconds || s.durationSeconds >= 90)
-            .filter(s => !newQueue.some(q => q.id === s.id))
-            .filter(s => !isLikelySameSong(s.title, currentSongTitle));
-          newQueue = [...newQueue, ...cleanTopUp].slice(0, 40);
-        } catch (topUpError) {
-          console.warn('Queue top-up fetch failed:', topUpError);
-        }
-      }
-
+      // ── MERGE INTO EXISTING QUEUE (no repeats) ───────────────────────────
       setQueue(prevQueue => {
-        const normalizeArtist = (artist = '') =>
-          artist.toLowerCase().replace(/ - topic|vevo/gi, '').replace(/[^a-z0-9 ]/g, ' ').trim();
-        const normalizeTitle = (title = '') => normalizeTitleKey(title).split(' ').filter(Boolean).slice(0, 6).join(' ');
-
-        const existingIds = new Set(prevQueue.map(s => s.id));
-        existingIds.add(song.id);
-        if (currentSong) existingIds.add(currentSong.id);
-
-        sessionPlayedIds.current.forEach(id => existingIds.add(id));
-
-        const existingArtistCounts = prevQueue.reduce((acc, item) => {
-          const key = normalizeArtist(item.artist);
-          if (key) acc.set(key, (acc.get(key) || 0) + 1);
-          return acc;
-        }, new Map());
-        const seenTitles = new Set(prevQueue.map(item => normalizeTitle(item.title)));
-        seenTitles.add(normalizeTitle(song.title));
-        const seenTitleTokens = [
-          ...prevQueue.map(item => titleTokenSet(item.title)),
-          titleTokenSet(song.title),
-          ...playedTitleTokenSetsRef.current
-        ];
-        const maxPerArtist = 2;
-
-        const diversifiedNew = [];
-        for (const candidate of newQueue) {
-          if (existingIds.has(candidate.id)) continue;
-
-          const titleKey = normalizeTitle(candidate.title);
-          if (seenTitles.has(titleKey)) continue;
-          const candidateTokens = titleTokenSet(candidate.title);
-          const tooSimilarInQueue = seenTitleTokens.some(tokens => tokenSimilarity(candidateTokens, tokens) >= 0.66);
-          if (tooSimilarInQueue) continue;
-
-          const artistKey = normalizeArtist(candidate.artist);
-          if (artistKey && (existingArtistCounts.get(artistKey) || 0) >= maxPerArtist) continue;
-
-          diversifiedNew.push(candidate);
-          seenTitles.add(titleKey);
-          seenTitleTokens.push(candidateTokens);
-          if (artistKey) {
-            existingArtistCounts.set(artistKey, (existingArtistCounts.get(artistKey) || 0) + 1);
-          }
-        }
-
-        if (diversifiedNew.length < minQueueTarget) {
-          for (const candidate of newQueue) {
-            if (diversifiedNew.length >= minQueueTarget) break;
-            if (existingIds.has(candidate.id) || diversifiedNew.some(item => item.id === candidate.id)) continue;
-            const titleKey = normalizeTitle(candidate.title);
-            if (seenTitles.has(titleKey)) continue;
-            if (isLikelySameSong(candidate.title, currentSongTitle)) continue;
-            const candidateTokens = titleTokenSet(candidate.title);
-            const tooSimilarInQueue = seenTitleTokens.some(tokens => tokenSimilarity(candidateTokens, tokens) >= 0.66);
-            if (tooSimilarInQueue) continue;
-            diversifiedNew.push(candidate);
-            seenTitles.add(titleKey);
-            seenTitleTokens.push(candidateTokens);
-          }
-        }
-
-        return [...prevQueue, ...diversifiedNew].slice(0, 50);
+        const prevIds = new Set(prevQueue.map(s => s.id));
+        prevIds.add(song.id);
+        if (currentSong) prevIds.add(currentSong.id);
+        sessionPlayedIds.current.forEach(id => prevIds.add(id));
+        const newEntries = finalQueue.filter(s => !prevIds.has(s.id));
+        return [...prevQueue, ...newEntries].slice(0, 60);
       });
+
     } catch (err) {
-      console.error(err);
+      console.error('fetchQueue error:', err);
     } finally {
       setIsFetchingQueue(false);
     }
   };
+
+
+
 
   const streamEndpointBase = 'https://play-infinity.vercel.app/api/stream';
 
