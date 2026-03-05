@@ -669,10 +669,28 @@ export default function App() {
 
         navigator.mediaSession.setActionHandler('previoustrack', () => {
           if (playPrevRef.current) playPrevRef.current();
+          navigator.mediaSession.playbackState = 'playing';
         });
 
         navigator.mediaSession.setActionHandler('nexttrack', () => {
           if (playNextRef.current) playNextRef.current();
+          navigator.mediaSession.playbackState = 'playing';
+        });
+
+        navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+          const skipTime = details.seekOffset || 10;
+          const newPos = Math.max(backgroundAudio ? backgroundAudio.currentTime - skipTime : progress - skipTime, 0);
+          if (backgroundAudio) backgroundAudio.currentTime = newPos;
+          if (playerRef.current) playerRef.current.seekTo(newPos, "seconds");
+          setProgress(newPos);
+        });
+
+        navigator.mediaSession.setActionHandler('seekforward', (details) => {
+          const skipTime = details.seekOffset || 10;
+          const newPos = Math.min(backgroundAudio ? backgroundAudio.currentTime + skipTime : progress + skipTime, duration || 999);
+          if (backgroundAudio) backgroundAudio.currentTime = newPos;
+          if (playerRef.current) playerRef.current.seekTo(newPos, "seconds");
+          setProgress(newPos);
         });
 
         navigator.mediaSession.setActionHandler('seekto', (details) => {
@@ -682,6 +700,14 @@ export default function App() {
           if (backgroundAudio) {
             backgroundAudio.currentTime = details.seekTime;
           }
+          setProgress(details.seekTime);
+        });
+
+        navigator.mediaSession.setActionHandler('stop', () => {
+          setIsPlaying(false);
+          if (backgroundAudio) backgroundAudio.pause();
+          silentAudioRef.current?.pause();
+          navigator.mediaSession.playbackState = 'none';
         });
       } catch (e) {
         console.warn("MediaSession handlers failed:", e);
