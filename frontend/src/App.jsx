@@ -218,14 +218,86 @@ export default function App() {
   // FEATURE: Music Director Collections
   // ──────────────────────────────────────────────────────
   const MUSIC_DIRECTORS = [
-    { id: 'anirudh', name: 'Anirudh', query: 'Anirudh Ravichander tamil hit songs -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#f97316] to-[#ef4444]', emoji: '🎸', subtitle: 'Music Director' },
-    { id: 'arrahman', name: 'A.R. Rahman', query: 'AR Rahman tamil hit songs -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#6366f1] to-[#8b5cf6]', emoji: '🎹', subtitle: 'Music Director' },
-    { id: 'harris', name: 'Harris Jayaraj', query: 'Harris Jayaraj tamil hit songs -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#0ea5e9] to-[#6366f1]', emoji: '🎻', subtitle: 'Music Director' },
-    { id: 'yuvan', name: 'Yuvan Shankar Raja', query: 'Yuvan Shankar Raja tamil hit songs -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#10b981] to-[#0ea5e9]', emoji: '🎵', subtitle: 'Music Director' },
-    { id: 'deva', name: 'Deva', query: 'Deva tamil hit songs -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#ec4899] to-[#f97316]', emoji: '🥁', subtitle: 'Music Director' },
-    { id: 'ilayaraja', name: 'Ilaiyaraaja', query: 'Ilaiyaraaja evergreen tamil hit songs -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#f59e0b] to-[#ec4899]', emoji: '🎼', subtitle: 'Music Director' },
-    { id: 'gv', name: 'G.V. Prakash', query: 'GV Prakash Kumar tamil hit songs -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#14b8a6] to-[#22c55e]', emoji: '🎤', subtitle: 'Music Director' },
-    { id: 'sid', name: 'Sid Sriram', query: 'Sid Sriram tamil hit songs -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#a855f7] to-[#ec4899]', emoji: '🎧', subtitle: 'Top Singer' },
+    {
+      id: 'anirudh', name: 'Anirudh', color: 'from-[#f97316] to-[#ef4444]', emoji: '🎸', subtitle: 'Music Director',
+      query: 'Anirudh Ravichander tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
+      queries: [
+        'Anirudh Ravichander Vijay songs tamil audio',
+        'Anirudh 96 Remo Kaaki Sattai songs tamil',
+        'Anirudh Rajinikanth Petta Darbar songs',
+        'Anirudh Master Beast Jailer songs tamil',
+      ]
+    },
+    {
+      id: 'arrahman', name: 'A.R. Rahman', color: 'from-[#6366f1] to-[#8b5cf6]', emoji: '🎹', subtitle: 'Music Director',
+      query: 'AR Rahman tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
+      queries: [
+        'AR Rahman Roja Bombay tamil songs audio',
+        'AR Rahman Mani Ratnam tamil songs',
+        'AR Rahman Kadhalan Gentleman Muthu songs',
+        'AR Rahman Enthiran Maryan tamil songs',
+      ]
+    },
+    {
+      id: 'harris', name: 'Harris Jayaraj', color: 'from-[#0ea5e9] to-[#6366f1]', emoji: '🎻', subtitle: 'Music Director',
+      query: 'Harris Jayaraj tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
+      queries: [
+        'Harris Jayaraj Ghajini Kaakha Kaakha songs',
+        'Harris Jayaraj Vinnaithaandi Varuvaaya songs',
+        'Harris Jayaraj Anniyan Unnale Unnale songs',
+        'Harris Jayaraj tamil melody songs audio',
+      ]
+    },
+    {
+      id: 'yuvan', name: 'Yuvan Shankar Raja', color: 'from-[#10b981] to-[#0ea5e9]', emoji: '🎵', subtitle: 'Music Director',
+      query: 'Yuvan Shankar Raja tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
+      queries: [
+        'Yuvan Shankar Raja Mankatha Billa songs',
+        'Yuvan Shankar Raja 7G Rainbow Colony songs',
+        'Yuvan Madrasapattinam Ayan tamil songs',
+        'Yuvan Thanga Magan Iruvar songs tamil',
+      ]
+    },
+    {
+      id: 'deva', name: 'Deva', color: 'from-[#ec4899] to-[#f97316]', emoji: '🥁', subtitle: 'Music Director',
+      query: 'Deva tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
+      queries: [
+        'Deva Rajinikanth Murasoli Muthal Mariyathai songs',
+        'Deva Vijay Kushi Thirumalai songs tamil',
+        'Deva Vikram tamil songs audio',
+        'Deva classic tamil hit songs',
+      ]
+    },
+    {
+      id: 'ilayaraja', name: 'Ilaiyaraaja', color: 'from-[#f59e0b] to-[#ec4899]', emoji: '🎼', subtitle: 'Music Director',
+      query: 'Ilaiyaraaja evergreen tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
+      queries: [
+        'Ilaiyaraaja Moondram Pirai Ninaithale Innikkum songs',
+        'Ilaiyaraaja Nayagan Punnagai Mannan songs',
+        'Ilaiyaraaja Agni Natchathiram Thalapathi songs',
+        'Ilaiyaraaja classic 80s tamil melody songs',
+      ]
+    },
+    {
+      id: 'gv', name: 'G.V. Prakash', color: 'from-[#14b8a6] to-[#22c55e]', emoji: '🎤', subtitle: 'Music Director',
+      query: 'GV Prakash Kumar tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
+      queries: [
+        'GV Prakash Aadukalam Mynaa songs tamil',
+        'GV Prakash Inaindha Kaigal Irudhi Suttru songs',
+        'GV Prakash Puriyaatha Puthir Darling songs',
+        'GV Prakash 8 Thottakal Saahasam songs',
+      ]
+    },
+    {
+      id: 'sid', name: 'Sid Sriram', color: 'from-[#a855f7] to-[#ec4899]', emoji: '🎧', subtitle: 'Top Singer',
+      query: 'Sid Sriram tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
+      queries: [
+        'Sid Sriram Kannaana Kanney tamil songs',
+        'Sid Sriram Nenjame Nenjame Vendhu Thanindhathu Kaadu songs',
+        'Sid Sriram Dear Comrade Adithya Varma songs',
+        'Sid Sriram tamil melody songs audio',
+      ]
+    },
   ];
 
   // ──────────────────────────────────────────────────────
@@ -242,34 +314,58 @@ export default function App() {
     {
       id: 'trending_now',
       name: 'Trending Now',
-      query: 'Anirudh Yuvan tamil hit songs 2024 audio -jukebox -mashup -nonstop -shorts -reels -status -teaser -trailer',
       color: 'from-[#ff007f] to-[#ff7f00]',
       emoji: '🔥',
-      subtitle: 'Current Hits'
+      subtitle: 'Current Hits',
+      query: 'Anirudh tamil hit songs 2024 trending audio',
+      queries: [
+        'Anirudh 2024 tamil hit songs audio',
+        'Yuvan GV Prakash 2024 tamil songs audio',
+        'Ajith Vijay Dhanush 2024 tamil songs audio',
+        'Sid Sriram Anirudh 2025 tamil songs audio',
+      ]
     },
     {
       id: '2k_kids',
       name: '2K Kids',
-      query: 'Anirudh tamil hit songs Mersal Bigil Vikram audio -jukebox -mashup -nonstop -shorts -reels -status -teaser',
       color: 'from-[#00f2fe] to-[#4facfe]',
       emoji: '🎧',
-      subtitle: 'After 2015'
+      subtitle: 'After 2015',
+      query: 'Anirudh Mersal Bigil tamil songs audio',
+      queries: [
+        'Mersal Bigil tamil songs Anirudh audio',
+        'Master Vikram Beast tamil songs audio',
+        'Jailer Darbar Petta Rajinikanth songs',
+        'Dhanush Sivakarthikeyan 2016 2017 2018 tamil songs',
+      ]
     },
     {
       id: '90s_hits',
       name: '90s Hits',
-      query: 'AR Rahman 90s tamil songs Roja Bombay Kadhal audio -jukebox -mashup -nonstop -shorts -reels -status',
       color: 'from-[#f6d365] to-[#fda085]',
       emoji: '📼',
-      subtitle: '1990 – 2015'
+      subtitle: '1990 – 2015',
+      query: 'AR Rahman 90s tamil songs Roja Bombay audio',
+      queries: [
+        'AR Rahman Roja Bombay Kadhal Desam songs',
+        'AR Rahman Mani Ratnam Ilaiyaraaja 2000s tamil songs',
+        'Harris Jayaraj Yuvan 2000s tamil hit songs audio',
+        'Shankar tamil songs Enthiran Sivaji audio',
+      ]
     },
     {
       id: '80s_classics',
       name: '80s Classics',
-      query: 'Ilaiyaraaja classic 80s tamil film songs -jukebox -mashup -nonstop -shorts -reels -status',
       color: 'from-[#d4fc79] to-[#96e6a1]',
       emoji: '📻',
-      subtitle: 'Before 1990'
+      subtitle: 'Before 1990',
+      query: 'Ilaiyaraaja classic 80s tamil songs audio',
+      queries: [
+        'Ilaiyaraaja Ninaithale Innikkum Moondram Pirai songs',
+        'Ilaiyaraaja Nayagan Punnagai Mannan songs tamil',
+        'Ilaiyaraaja Agni Natchathiram Thalapathi songs',
+        'Ilaiyaraaja SPB 80s classic tamil melody songs',
+      ]
     },
   ];
 
@@ -283,7 +379,7 @@ export default function App() {
     setDirectorLoading(true);
     setDirectorSongs([]);
     try {
-      const cacheKey = `director_${director.id}`;
+      const cacheKey = `director_v2_${director.id}`;
       const cached = sessionStorage.getItem(cacheKey);
       if (cached) {
         setDirectorSongs(JSON.parse(cached));
@@ -291,12 +387,34 @@ export default function App() {
         return;
       }
       const apiEndpoint = 'https://play-infinity.vercel.app/api/search';
-      const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(director.query)}`);
-      const data = await res.json();
-      let results = Array.isArray(data) ? data : (data.videos || []);
-      results = applyBaseFilter(applyTamilFilter(results));
-      sessionStorage.setItem(cacheKey, JSON.stringify(results));
-      setDirectorSongs(results);
+      // Use multi-query parallel fetch if queries array exists, else fall back to single query
+      const queryList = director.queries || [director.query];
+      const results = await Promise.allSettled(
+        queryList.map(q =>
+          fetch(`${apiEndpoint}?q=${encodeURIComponent(q)}`)
+            .then(r => r.json())
+            .then(d => Array.isArray(d) ? d : (d.videos || []))
+            .catch(() => [])
+        )
+      );
+      // Flatten all results
+      let combined = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+      // Deduplicate by video ID first, then by normalized title
+      const seenIds = new Set();
+      const seenTitles = new Set();
+      combined = combined.filter(s => {
+        if (!s || !s.id) return false;
+        const titleKey = (s.title || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30);
+        if (seenIds.has(s.id) || seenTitles.has(titleKey)) return false;
+        seenIds.add(s.id);
+        seenTitles.add(titleKey);
+        return true;
+      });
+      // Apply Tamil + quality filter, shuffle slightly, cap at 20
+      combined = applyBaseFilter(applyTamilFilter(combined));
+      combined = combined.sort(() => 0.1 - Math.random()).slice(0, 20);
+      sessionStorage.setItem(cacheKey, JSON.stringify(combined));
+      setDirectorSongs(combined);
     } catch (err) {
       console.error('Director songs fetch error:', err);
     } finally {
