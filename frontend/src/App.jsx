@@ -710,20 +710,41 @@ export default function App() {
     fetchTrending();
   }, []);
 
-  const searchYoutube = async (e) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
+  // ── CLEAN TITLE: Strip YouTube junk from song titles ─────────────────────
+  const cleanTitle = (raw = '') => {
+    return raw
+      .replace(/\s*[|\-–—•·]\s*(official|lyric|lyrics|video|audio|song|songs|hd|hq|4k|8k|full|feat\.?|ft\.?|starring|music video|video song|audio song|tamil song|tamil|whatsapp status|status|remaster|remastered|\d{4})[^|\-–—•·]*/gi, '')
+      .replace(/\s*\([^)]{0,40}(official|lyric|audio|hd|remaster|\d{4})[^)]*\)/gi, '')
+      .replace(/\s*\[[^\]]{0,40}(official|lyric|audio|hd|remaster|\d{4})[^\]]*\]/gi, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  };
+
+  // ── QUICK GENRE SEARCH ────────────────────────────────────────────────────
+  const GENRE_CHIPS = [
+    { label: '💃 Kuthu', query: 'tamil kuthu mass dance songs' },
+    { label: '❤️ Love', query: 'tamil love melody romantic songs' },
+    { label: '😢 Sad', query: 'tamil sad feeling songs' },
+    { label: '🔥 Trending', query: 'Anirudh 2024 2025 tamil trending songs' },
+    { label: '🎸 Anirudh', query: 'Anirudh Ravichander tamil hit songs' },
+    { label: '🎹 Rahman', query: 'AR Rahman evergreen tamil songs' },
+    { label: '🎻 Harris', query: 'Harris Jayaraj tamil melody songs' },
+    { label: '🎵 Yuvan', query: 'Yuvan Shankar Raja tamil hit songs' },
+    { label: '📻 Classic', query: 'Ilaiyaraaja classic 80s 90s tamil songs' },
+    { label: '🎤 Sid', query: 'Sid Sriram tamil songs' },
+  ];
+
+  const searchYoutube = async (e, overrideQuery) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const q = overrideQuery || searchQuery;
+    if (!q.trim()) return;
     setLoading(true);
     try {
-      // Fetch from local dev proxy or Vercel serverless function
       const apiEndpoint = `https://play-infinity.vercel.app/api/search`;
-      const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(searchQuery + ' tamil song')}`);
+      const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(q + ' tamil song')}`);
       const data = await res.json();
       let results = Array.isArray(data) ? data : (data.videos || []);
-
-      // Strict Tamil-only filter
       results = applyBaseFilter(applyTamilFilter(results));
-
       setSongs(results);
     } catch (err) {
       console.error(err);
@@ -1457,13 +1478,54 @@ export default function App() {
                                 )}
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                               </div>
-                              <span className="text-white text-[11px] font-semibold truncate leading-tight">{song.title}</span>
-                              <span className="text-white/40 text-[10px] truncate mt-0.5">{song.artist}</span>
+                              <span className="text-white text-[11px] font-semibold truncate leading-tight">{cleanTitle(song.title)}</span>
+                              <span className="text-white/40 text-[10px] truncate mt-0.5">{song.artist?.replace(/ - Topic| VEVO/gi, '')}</span>
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
+
+                    {/* Suggested For You — based on listen history mood */}
+                    {listenHistory.length >= 3 && trendingSongs.length > 0 && (() => {
+                      // Pick mood from most recent song listened
+                      const recentTitle = (listenHistory[0]?.title || '').toLowerCase();
+                      const isLove = /love|kadhal|romantic|melody|vaseegara|nenjukkul|hosanna|un perai/.test(recentTitle);
+                      const isKuthu = /kuthu|mass|dance|rowdy|vaathi|verithanam|appadi/.test(recentTitle);
+                      const suggestedLabel = isLove ? '❤️ More Love Songs' : isKuthu ? '🔥 More Kuthu Bangers' : '🎵 Suggested For You';
+                      // Filter trending that don't overlap with listenHistory
+                      const playedIds = new Set(listenHistory.map(s => s.id));
+                      const suggested = trendingSongs.filter(s => !playedIds.has(s.id)).slice(0, 10);
+                      if (suggested.length < 3) return null;
+                      return (
+                        <div className="mb-6">
+                          <div className="flex items-center justify-between mb-3">
+                            <h2 className="text-base font-bold text-white">{suggestedLabel}</h2>
+                            <span className="text-[10px] text-white/30 font-semibold">Tamil Only</span>
+                          </div>
+                          <div className="flex overflow-x-auto gap-3 no-scrollbar pb-2">
+                            {suggested.map((song, i) => (
+                              <div key={`sug-${i}`} onClick={() => playSong(song)} className="flex flex-col w-[130px] shrink-0 cursor-pointer group active:scale-95 transition-all">
+                                <div className="relative w-[130px] h-[130px] mb-2 rounded-2xl overflow-hidden shadow-lg">
+                                  <img src={song.thumbnail} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                  {currentSong?.id === song.id && isPlaying && (
+                                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                      <div className="flex gap-[2px] items-end h-5">
+                                        {[0, 1, 2].map(b => <div key={b} className="w-1 rounded-full animate-bounce" style={{ height: `${8 + b * 4}px`, backgroundColor: dominantColor, animationDelay: `${b * 0.1}s` }} />)}
+                                      </div>
+                                    </div>
+                                  )}
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                                </div>
+                                <span className="text-white text-[11px] font-semibold truncate leading-tight">{cleanTitle(song.title)}</span>
+                                <span className="text-white/40 text-[10px] truncate mt-0.5">{song.artist?.replace(/ - Topic| VEVO/gi, '')}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
 
                     {/* Trending Now */}
                     {trendingSongs.length > 0 && (
@@ -1562,7 +1624,26 @@ export default function App() {
                 <div className="px-4 pb-24 space-y-1">
                   {favorites.length > 0 ? favorites.map((song, idx) => (
                     <DesktopSongRow key={song.id} song={song} onSelect={() => playSong(song)} isFavorite={true} onToggleFavorite={(e) => toggleFavorite(e, song)} />
-                  )) : <p className="text-center py-20 text-gray-500">No liked songs yet.</p>}
+                  )) : (
+                    <div className="flex flex-col items-center justify-center pt-16 pb-8 text-center px-6">
+                      <div className="relative mb-6">
+                        <div className="w-28 h-28 rounded-full flex items-center justify-center" style={{ background: `${dominantColor}22`, border: `2px solid ${dominantColor}44` }}>
+                          <Heart size={44} className="text-[#a080ff]" />
+                        </div>
+                        <div className="absolute -top-1 -right-1 text-2xl animate-bounce">🎵</div>
+                        <div className="absolute -bottom-1 -left-2 text-xl animate-bounce" style={{ animationDelay: '0.2s' }}>🎶</div>
+                      </div>
+                      <h3 className="text-white font-bold text-lg mb-2">No liked songs yet</h3>
+                      <p className="text-white/40 text-sm leading-relaxed mb-6">Tap the ♥ heart on any song while it's playing to save it here</p>
+                      <button
+                        onClick={() => setActiveTab('Search')}
+                        className="px-6 py-3 rounded-full font-bold text-sm text-black"
+                        style={{ background: dominantColor }}
+                      >
+                        🔍 Discover Songs
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1687,30 +1768,48 @@ export default function App() {
             {/* SEARCH VIEW */}
             {activeTab === 'Search' && (
               <div className="p-4 pt-10 flex flex-col h-full bg-[#121212] animate-fade-in animate-slide-up-premium">
-                <h1 className="text-2xl font-bold text-white mb-6">Search</h1>
-                <form onSubmit={searchYoutube} className="mb-6 shrink-0">
+                <h1 className="text-2xl font-bold text-white mb-4">Search</h1>
+                <form onSubmit={searchYoutube} className="mb-4 shrink-0">
                   <div className="relative">
                     <input
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Artists, songs, or podcasts"
-                      className="w-full bg-white text-black px-4 py-[12px] pl-10 pr-12 rounded-sm outline-none font-bold text-[14px]"
+                      placeholder="Songs, artists, moods..."
+                      className="w-full bg-white text-black px-4 py-[12px] pl-10 pr-12 rounded-xl outline-none font-semibold text-[14px] shadow-lg"
                     />
                     <Search className="absolute left-3 top-3.5 text-[#121212]" size={18} />
                     {searchQuery && (
-                      <button type="button" onClick={() => setSearchQuery('')} className="absolute right-3 top-3.5 text-gray-400 p-0.5">
+                      <button type="button" onClick={() => { setSearchQuery(''); setSongs([]); }} className="absolute right-3 top-3.5 text-gray-400 p-0.5">
                         <X size={18} />
                       </button>
                     )}
                   </div>
                 </form>
 
+                {/* Quick Genre Chips */}
+                {songs.length === 0 && !loading && (
+                  <div className="mb-4 shrink-0">
+                    <p className="text-xs text-white/40 font-bold uppercase tracking-wider mb-2">Browse by mood</p>
+                    <div className="flex overflow-x-auto gap-2 no-scrollbar pb-1">
+                      {GENRE_CHIPS.map((chip) => (
+                        <button
+                          key={chip.label}
+                          onClick={() => { setSearchQuery(chip.label); searchYoutube(null, chip.query); }}
+                          className="shrink-0 px-4 py-2 rounded-full text-sm font-bold bg-[#1a1c2a] text-white border border-[#3e3e3e]/60 hover:border-[#8cd92b]/60 hover:text-[#8cd92b] active:scale-95 transition-all whitespace-nowrap"
+                        >
+                          {chip.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex-1 overflow-y-auto no-scrollbar pb-24 overscroll-contain">
                   {songs.length === 0 && searchHistory.length > 0 && (
-                    <div className="mb-8 mt-2 px-1 animate-fade-in">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-sm font-bold text-white/80 lowercase tracking-wider">Recent Searches</h3>
+                    <div className="mb-6 mt-2 px-1 animate-fade-in">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider">Recent</h3>
                         <button
                           onClick={() => { setSearchHistory([]); localStorage.removeItem('musicHistory'); }}
                           className="text-[10px] uppercase font-bold text-[#8cd92b] hover:opacity-70 transition-opacity"
@@ -1718,15 +1817,17 @@ export default function App() {
                           Clear All
                         </button>
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        {searchHistory.slice(0, 6).map((item, i) => (
+                      <div className="space-y-1">
+                        {searchHistory.slice(0, 5).map((item, i) => (
                           <div
                             key={i}
                             onClick={() => { setSearchQuery(item.title || item); searchYoutube(null, item.title || item); }}
-                            className="bg-[#2a2a2a] px-4 py-2 rounded-full text-sm text-white border border-[#3e3e3e]/50 flex items-center gap-2 hover:bg-[#3e3e3e] transition-colors active:scale-95"
+                            className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 cursor-pointer transition-all active:scale-[0.98]"
                           >
-                            <Clock size={12} className="text-gray-500" />
-                            <span className="truncate max-w-[120px]">{item.title || item}</span>
+                            <div className="w-9 h-9 bg-[#2a2a2a] rounded-lg flex items-center justify-center shrink-0">
+                              <Clock size={14} className="text-gray-500" />
+                            </div>
+                            <span className="text-white text-sm font-medium truncate">{typeof item === 'string' ? item : item.title}</span>
                           </div>
                         ))}
                       </div>
@@ -1739,18 +1840,34 @@ export default function App() {
                     </div>
                   ) : (
                     <>
-                      <h3 className="text-sm font-bold text-white/60 mb-4 px-1 lowercase tracking-wider">
-                        {songs.length > 0 ? "Top Results" : "Suggestions for you"}
-                      </h3>
+                      {(songs.length > 0 || displaySongs.length > 0) && (
+                        <h3 className="text-xs font-bold text-white/40 mb-3 px-1 uppercase tracking-wider">
+                          {songs.length > 0 ? `${songs.length} results` : 'Suggestions for you'}
+                        </h3>
+                      )}
                       <div className="space-y-1">
                         {(songs.length > 0 ? songs : displaySongs).map((song) => (
-                          <div key={song.id} onClick={() => playSong(song)} className="flex items-center gap-3 p-2 hover:bg-[#ffffff0a] rounded-md cursor-pointer transition-all active:scale-[0.98] active:opacity-80">
-                            <img src={song.thumbnail} alt="" className="w-12 h-12 object-cover shrink-0 rounded-md shadow-sm" />
-                            <div className="flex-1 overflow-hidden">
-                              <h4 className="font-semibold text-white text-[14px] truncate">{song.title}</h4>
-                              <p className="text-[12px] text-[#a0a0a0] truncate mt-0.5">{song.artist}</p>
+                          <div key={song.id} onClick={() => playSong(song)} className="flex items-center gap-3 p-2 hover:bg-[#ffffff0a] rounded-xl cursor-pointer transition-all active:scale-[0.98] active:opacity-80">
+                            <div className="relative shrink-0">
+                              <img src={song.thumbnail} alt="" className="w-12 h-12 object-cover rounded-xl shadow-sm" />
+                              {currentSong?.id === song.id && isPlaying && (
+                                <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
+                                  <div className="flex gap-[2px] items-end h-4">
+                                    {[0, 1, 2].map(b => <div key={b} className="w-[3px] rounded-full animate-bounce" style={{ height: `${7 + b * 3}px`, backgroundColor: dominantColor, animationDelay: `${b * 0.1}s` }} />)}
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                            <MoreHorizontal size={18} className="text-gray-500" />
+                            <div className="flex-1 overflow-hidden">
+                              <h4 className="font-semibold text-white text-[13px] truncate leading-snug">{cleanTitle(song.title)}</h4>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <p className="text-[11px] text-[#a0a0a0] truncate">{song.artist?.replace(/ - Topic| VEVO/gi, '')}</p>
+                                {song.durationSeconds > 0 && (
+                                  <span className="text-[10px] text-white/25 shrink-0 font-mono">{Math.floor(song.durationSeconds / 60)}:{String(song.durationSeconds % 60).padStart(2, '0')}</span>
+                                )}
+                              </div>
+                            </div>
+                            <MoreHorizontal size={16} className="text-gray-600 shrink-0" />
                           </div>
                         ))}
                       </div>
@@ -1882,25 +1999,42 @@ export default function App() {
 
                 {/* Song Info */}
                 <div className="w-full max-w-[340px] mt-12 mb-6 flex justify-between items-center gap-2">
-                  <div className="flex-1 overflow-hidden">
-                    <h2 className="text-[22px] font-bold text-white truncate leading-tight">{currentSong.title}</h2>
-                    <p className="text-[16px] text-[#a0a0a0] font-medium mt-1 truncate">{currentSong.artist || 'Unknown Artist'}</p>
+                  <div className="w-full mb-4">
+                    <h2 className="text-[22px] font-bold text-white truncate leading-tight">{cleanTitle(currentSong.title)}</h2>
+                    <p className="text-[16px] text-[#a0a0a0] font-medium mt-1 truncate">{currentSong.artist?.replace(/ - Topic| VEVO/gi, '') || 'Unknown Artist'}</p>
                   </div>
                   <div className="shrink-0 p-2">
                     <AnimatedHeart size={24} isFavorite={favoriteIds.has(currentSong.id)} onClick={(e) => toggleFavorite(e, currentSong)} />
                   </div>
                 </div>
 
-                {/* Progress Bar (Line) */}
+                {/* Progress Bar (Line) — thicker with scrub thumb */}
                 <div className="w-full max-w-[340px] relative mt-2 group px-2">
                   <input
                     type="range" min={0} max={duration || 1} value={progress} onChange={handleSeek}
-                    className="absolute top-0 inset-x-2 h-4 -mt-1.5 opacity-0 z-10 cursor-pointer"
+                    className="absolute inset-x-2 top-0 h-8 -mt-2 opacity-0 z-20 cursor-pointer w-[calc(100%-16px)]"
                   />
-                  <div className="w-full h-[6px] bg-white/10 rounded-full overflow-hidden relative mb-2">
-                    <div className={`h-full rounded-full absolute top-0 left-0 transition-all duration-300 pointer-events-none ${isPlaying ? 'progress-glow' : 'bg-white/60'}`} style={{ width: `${(progress / (duration || 1)) * 100}%`, backgroundColor: isPlaying ? dominantColor : undefined, boxShadow: isPlaying ? `0 0 15px ${dominantColor}` : undefined }}></div>
+                  <div className="w-full h-[5px] bg-white/10 rounded-full relative mb-1 mt-3">
+                    {/* Filled track */}
+                    <div
+                      className="h-full rounded-full absolute top-0 left-0 transition-all duration-200 pointer-events-none"
+                      style={{
+                        width: `${(progress / (duration || 1)) * 100}%`,
+                        backgroundColor: dominantColor,
+                        boxShadow: `0 0 8px ${dominantColor}88`
+                      }}
+                    />
+                    {/* Thumb dot */}
+                    <div
+                      className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full shadow-xl border-2 border-black pointer-events-none transition-all duration-200"
+                      style={{
+                        left: `calc(${(progress / (duration || 1)) * 100}% - 8px)`,
+                        backgroundColor: dominantColor,
+                        boxShadow: `0 0 12px ${dominantColor}`
+                      }}
+                    />
                   </div>
-                  <div className="flex justify-between text-[11px] text-[#a0a0a0] font-bold tracking-widest">
+                  <div className="flex justify-between text-[11px] text-[#a0a0a0] font-bold tracking-widest mt-3">
                     <span>{formatTime(progress)}</span>
                     <span>{formatTime(duration)}</span>
                   </div>
@@ -1973,25 +2107,31 @@ export default function App() {
                       {isFetchingQueue && <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
                     </div>
 
-                    <div className="space-y-4 relative z-10 pb-4">
-                      {queue.map(song => (
+                    <div className="space-y-3 relative z-10 pb-4">
+                      {queue.map((song, qi) => (
                         <div
                           key={song.id}
                           onClick={() => playSong(song, true)}
-                          className="flex items-center gap-3 p-1 rounded-md cursor-pointer transition-all hover:bg-[#ffffff0a]"
+                          className="flex items-center gap-3 p-1.5 rounded-xl cursor-pointer transition-all hover:bg-white/5 active:scale-[0.98]"
                         >
-                          <div className="w-12 h-12 min-w-[48px] rounded-[6px] overflow-hidden bg-[#2a2a2a] shrink-0 shadow-sm border border-[#3e3e3e]/30">
+                          <div className="relative w-11 h-11 min-w-[44px] rounded-xl overflow-hidden bg-[#2a2a2a] shrink-0 shadow-sm">
                             <img src={song.thumbnail} alt={song.title} className="w-full h-full object-cover" />
+                            <div className="absolute top-0.5 left-0.5 bg-black/70 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full leading-tight">{qi + 1}</div>
                           </div>
                           <div className="flex-1 overflow-hidden">
-                            <h4 className="font-semibold text-white text-[14px] truncate">{song.title}</h4>
-                            <p className="text-[12px] text-[#a0a0a0] truncate mt-0.5">{song.artist || 'Unknown Artist'}</p>
+                            <h4 className="font-semibold text-white text-[13px] truncate leading-snug">{cleanTitle(song.title)}</h4>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <p className="text-[11px] text-[#a0a0a0] truncate">{song.artist?.replace(/ - Topic| VEVO/gi, '') || 'Unknown'}</p>
+                              {song.durationSeconds > 0 && (
+                                <span className="text-[10px] text-white/25 shrink-0 font-mono">{Math.floor(song.durationSeconds / 60)}:{String(song.durationSeconds % 60).padStart(2, '0')}</span>
+                              )}
+                            </div>
                           </div>
                           <button
                             onClick={(e) => { e.stopPropagation(); setQueue(prev => prev.filter(q => q.id !== song.id)); }}
-                            className="p-2 text-gray-500 hover:text-red-400 transition-colors"
+                            className="p-2 text-gray-600 hover:text-red-400 transition-colors shrink-0"
                           >
-                            <X size={14} />
+                            <X size={13} />
                           </button>
                         </div>
                       ))}
