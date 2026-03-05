@@ -107,7 +107,10 @@ export default function App() {
   const playerRef = useRef(null);
   const sessionPlayedIds = useRef(new Set());
   const playedTitleTokenSetsRef = useRef([]);
+  // Stack of songs played — for the ⏮ Previous button to navigate back
+  const playHistoryStack = useRef([]);
   const [trendingSongs, setTrendingSongs] = useState([]);
+
 
   const [searchHistory, setSearchHistory] = useState(() => {
     const saved = localStorage.getItem('musicHistory');
@@ -952,6 +955,13 @@ export default function App() {
     sessionPlayedIds.current.add(song.id);
     addPlayedTitleTokens(song.title);
 
+    // Push current song to history stack BEFORE switching (so ⏮ can go back)
+    if (currentSong && (!playHistoryStack.current.length || playHistoryStack.current[playHistoryStack.current.length - 1]?.id !== currentSong.id)) {
+      playHistoryStack.current.push(currentSong);
+      // Keep stack size reasonable
+      if (playHistoryStack.current.length > 50) playHistoryStack.current.shift();
+    }
+
     // Track listen history
     setListenHistory(prev => {
       const filtered = prev.filter(s => s.id !== song.id);
@@ -1036,14 +1046,29 @@ export default function App() {
   };
 
   const playPrev = () => {
-    if (fallbackSongs.length === 0) return;
-    const idx = fallbackSongs.findIndex(s => s.id === currentSong?.id);
-    if (idx > 0) {
-      playSong(fallbackSongs[idx - 1]);
-    } else {
-      playSong(fallbackSongs[0]);
+    // Pop from the play history stack to go back to the previous song
+    if (playHistoryStack.current.length > 0) {
+      // Peek first — skip any duplicate of current song at top of stack
+      while (
+        playHistoryStack.current.length > 0 &&
+        playHistoryStack.current[playHistoryStack.current.length - 1]?.id === currentSong?.id
+      ) {
+        playHistoryStack.current.pop();
+      }
+      if (playHistoryStack.current.length > 0) {
+        const prev = playHistoryStack.current.pop();
+        // Push current song to front of queue so ▶ Next can come back
+        setQueue(q => [currentSong, ...q.filter(s => s.id !== currentSong?.id)].slice(0, 60));
+        playSong(prev, true); // fromQueue=true so it doesn't clear the queue
+        return;
+      }
     }
+    // Fallback: use search results / trending songs
+    const pool = [...songs, ...trendingSongs];
+    const idx = pool.findIndex(s => s.id === currentSong?.id);
+    if (idx > 0) playSong(pool[idx - 1]);
   };
+
 
   const [directStreamUrl, setDirectStreamUrl] = useState(null);
   const currentStreamUrl = directStreamUrl || (currentSong ? `${streamEndpointBase}?videoId=${currentSong.id}` : '');
