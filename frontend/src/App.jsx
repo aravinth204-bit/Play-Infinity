@@ -369,15 +369,14 @@ export default function App() {
 
   const toggleFavorite = (e, song) => {
     if (e) e.stopPropagation();
-    setFavorites(prev => {
-      const exists = prev.some(s => s.id === song.id);
-      if (exists) {
-        showToast('Removed from Liked Songs', 'info');
-        return prev.filter(s => s.id !== song.id);
-      }
+    const alreadyFav = favorites.some(s => s.id === song.id);
+    if (alreadyFav) {
+      showToast('Removed from Liked Songs', 'info');
+      setFavorites(prev => prev.filter(s => s.id !== song.id));
+    } else {
       showToast('Added to Liked Songs ❤️', 'success');
-      return [song, ...prev].slice(0, 100);
-    });
+      setFavorites(prev => [song, ...prev].slice(0, 100));
+    }
   };
 
   const createPlaylist = () => {
@@ -1087,64 +1086,195 @@ export default function App() {
         {activeTab !== 'Music' && (
           <div className="flex-1 overflow-y-auto no-scrollbar pb-20 overscroll-contain scroll-smooth">
             {/* HOME VIEW */}
-            {activeTab === 'Home' && (
-              <div className="p-4 pt-10 overflow-x-hidden animate-fade-in animate-slide-up-premium" style={{ background: `linear-gradient(to bottom, ${dominantColor}33 0%, #121212 350px)` }}>
-                {/* Top Header */}
-                <div className="flex items-center justify-between mb-8 relative z-10 px-1 pt-2">
-                  <div className="flex items-center gap-3">
-                    <img src="/logo.png" alt="Logo" className="w-10 h-10 rounded-xl shadow-lg shadow-[#8cd92b]/20 shrink-0" />
-                    <span className="text-white text-2xl font-black tracking-tighter italic">ISAI </span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => setActiveTab('Search')} className="p-2.5 bg-[#2a2a2a] text-white rounded-full hover:bg-[#3e3e3e] transition-colors shadow-sm">
-                      <Search size={22} />
-                    </button>
-                    <button onClick={() => setActiveTab('History')} className="p-2.5 bg-[#2a2a2a] text-white rounded-full hover:bg-[#3e3e3e] transition-colors shadow-sm">
-                      <History size={22} />
-                    </button>
-                  </div>
-                </div>
+            {activeTab === 'Home' && (() => {
+              const hour = new Date().getHours();
+              const greeting = hour < 12 ? 'Good Morning ☀️' : hour < 17 ? 'Good Afternoon 🌤️' : hour < 21 ? 'Good Evening 🌆' : 'Good Night 🌙';
+              return (
+                <div className="overflow-x-hidden animate-fade-in">
+                  {/* Hero Header with dynamic gradient */}
+                  <div className="relative px-5 pt-12 pb-6 overflow-hidden" style={{ background: `linear-gradient(160deg, ${dominantColor}55 0%, #1a1a1a 60%, #121212 100%)` }}>
+                    {/* Decorative blobs */}
+                    <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full blur-3xl opacity-30 pointer-events-none" style={{ background: dominantColor }} />
+                    <div className="absolute top-20 -left-10 w-32 h-32 rounded-full blur-2xl opacity-20 pointer-events-none" style={{ background: dominantColor }} />
 
-                <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 mb-6 relative z-10">
-                  <button className="px-5 py-1.5 bg-[#1ed760] text-black rounded-full text-sm font-bold shrink-0">All</button>
-                  <button className="px-5 py-1.5 bg-[#2a2a2a] text-white rounded-full text-sm font-semibold shrink-0 hover:bg-[#3e3e3e]">Music</button>
-                  <button className="px-5 py-1.5 bg-[#2a2a2a] text-white rounded-full text-sm font-semibold shrink-0 hover:bg-[#3e3e3e]">Podcasts</button>
-                </div>
-
-                {/* Grid Section */}
-                <div className="grid grid-cols-2 gap-2 mb-8 relative z-10">
-                  <div onClick={() => setActiveTab('Favorites')} className="flex items-center bg-[#2a2a2a]/80 backdrop-blur-sm rounded-md overflow-hidden cursor-pointer hover:bg-[#3e3e3e]/80 transition-colors h-14 shadow-sm">
-                    <div className="w-14 h-14 bg-gradient-to-br from-[#4b22c7] to-[#8d8dec] shrink-0 flex items-center justify-center">
-                      <Heart size={20} fill="white" className="text-white relative top-0.5" />
-                    </div>
-                    <p className="px-2.5 text-xs font-bold text-white line-clamp-2 leading-tight">Liked Songs</p>
-                  </div>
-                  {fallbackSongs.slice(1, 8).map((song, i) => (
-                    <div key={i} onClick={() => playSong(song)} className="flex items-center bg-[#2a2a2a]/80 backdrop-blur-sm rounded-md overflow-hidden cursor-pointer hover:bg-[#3e3e3e]/80 transition-colors h-14 shadow-sm">
-                      <img src={song.thumbnail} alt="" className="w-14 h-14 object-cover shrink-0" />
-                      <p className="px-2.5 text-[11px] font-bold text-white line-clamp-2 leading-tight">{song.title}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Jump back in */}
-                <h2 className="text-xl font-bold text-white mb-4 pl-1">Jump back in</h2>
-                <div className="flex overflow-x-auto gap-4 no-scrollbar pb-8 mb-2 pl-1">
-                  {(searchHistory.length > 0 ? searchHistory : fallbackSongs.slice(8, 14)).map((song, i) => (
-                    <div key={`jump-${i}`} onClick={() => playSong(song)} className="flex flex-col w-[120px] shrink-0 cursor-pointer group">
-                      <div className="relative w-[120px] h-[120px] mb-3">
-                        <img src={song.thumbnail} alt="" className="w-full h-full object-cover rounded-md shadow-[0_8px_24px_rgba(0,0,0,0.5)] bg-[#262837]" />
-                        <div className="absolute top-2 left-2 text-[#8cd92b]">
-                          <img src="/logo.png" className="w-5 h-5 rounded-md object-cover shadow-sm bg-black/50" alt="icon" />
+                    {/* Top Bar */}
+                    <div className="flex items-center justify-between mb-6 relative z-10">
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <img src="/logo.png" alt="Logo" className="w-11 h-11 rounded-2xl shadow-lg shrink-0" />
+                          {isPlaying && <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#8cd92b] rounded-full border-2 border-[#121212] animate-pulse" />}
+                        </div>
+                        <div>
+                          <p className="text-white/50 text-[11px] font-semibold uppercase tracking-widest">{greeting}</p>
+                          <p className="text-white text-xl font-black tracking-tight">ISAI <span className="text-[#8cd92b]">இசை</span></p>
                         </div>
                       </div>
-                      <span className="text-white text-[12px] font-semibold truncate">{song.title}</span>
-                      <span className="text-[#a0a0a0] text-[11px] line-clamp-2 mt-1 leading-snug">{song.artist}</span>
+                      <div className="flex gap-2 relative z-10">
+                        <button onClick={() => setActiveTab('Search')} className="w-10 h-10 bg-white/10 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-white/20 transition-all active:scale-90 border border-white/10">
+                          <Search size={18} />
+                        </button>
+                        <button onClick={() => setActiveTab('History')} className="w-10 h-10 bg-white/10 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-white/20 transition-all active:scale-90 border border-white/10">
+                          <History size={18} />
+                        </button>
+                      </div>
                     </div>
-                  ))}
+
+                    {/* Currently Playing Hero Card (if song is playing) */}
+                    {currentSong && (
+                      <div onClick={() => setActiveTab('Music')} className="relative bg-black/30 backdrop-blur-xl rounded-3xl p-4 flex items-center gap-4 cursor-pointer border border-white/10 active:scale-[0.98] transition-all shadow-xl">
+                        <div className={`relative shrink-0 ${isPlaying ? 'animate-slow-pulse' : ''}`}>
+                          <img src={currentSong.thumbnail} alt="" className="w-16 h-16 rounded-2xl object-cover shadow-lg" />
+                          {isPlaying && (
+                            <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center">
+                              <div className="flex gap-[3px] items-end h-5">
+                                {[0,1,2,3].map(b => <div key={b} className="w-[3px] rounded-full bg-[#8cd92b]" style={{ height: `${6 + Math.sin(Date.now()/200 + b) * 6}px`, animation: `bounce ${0.4 + b*0.1}s ease-in-out infinite alternate` }} />)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                          <p className="text-[10px] uppercase tracking-widest font-bold" style={{ color: dominantColor }}>{isPlaying ? '▶ Now Playing' : '⏸ Paused'}</p>
+                          <h3 className="text-white font-bold text-sm truncate mt-0.5">{currentSong.title}</h3>
+                          <p className="text-white/50 text-xs truncate mt-0.5">{currentSong.artist}</p>
+                        </div>
+                        <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center flex-shrink-0 shadow-md active:scale-90 transition-all">
+                          {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Quick Access Grid */}
+                  <div className="px-4 mt-4">
+                    <div className="grid grid-cols-2 gap-2 mb-6">
+                      {[
+                        { label: 'Liked Songs', icon: <Heart size={18} fill="white" className="text-white" />, gradient: 'from-[#4b22c7] to-[#a680ff]', action: () => setActiveTab('Favorites'), count: `${favorites.length} songs` },
+                        { label: 'Recently Played', icon: <History size={18} className="text-white" />, gradient: 'from-[#c7225a] to-[#ff6b6b]', action: () => setActiveTab('History'), count: `${listenHistory.length} songs` },
+                        { label: 'Playlists', icon: <List size={18} className="text-white" />, gradient: 'from-[#226ac7] to-[#6bb8ff]', action: () => setActiveTab('Playlists'), count: `${playlists.length} playlists` },
+                        { label: 'Search Music', icon: <Search size={18} className="text-white" />, gradient: 'from-[#22b5c7] to-[#6bffeb]', action: () => setActiveTab('Search'), count: 'Find anything' },
+                      ].map((item, i) => (
+                        <div key={i} onClick={item.action} className="flex items-center bg-[#1e1e1e] rounded-xl overflow-hidden cursor-pointer active:scale-95 transition-all h-14 shadow-md border border-white/5">
+                          <div className={`w-14 h-14 bg-gradient-to-br ${item.gradient} shrink-0 flex items-center justify-center`}>
+                            {item.icon}
+                          </div>
+                          <div className="px-2.5 flex-1 overflow-hidden">
+                            <p className="text-white text-[11px] font-bold truncate">{item.label}</p>
+                            <p className="text-white/40 text-[9px] mt-0.5">{item.count}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Jump Back In */}
+                    {(searchHistory.length > 0 || listenHistory.length > 0) && (
+                      <div className="mb-6">
+                        <div className="flex items-center justify-between mb-3">
+                          <h2 className="text-base font-bold text-white">Jump Back In</h2>
+                          <button onClick={() => setActiveTab('History')} className="text-[10px] text-[#8cd92b] font-bold uppercase tracking-wider">See all</button>
+                        </div>
+                        <div className="flex overflow-x-auto gap-3 no-scrollbar pb-2">
+                          {(listenHistory.length > 0 ? listenHistory : searchHistory).slice(0, 8).map((song, i) => (
+                            <div key={`jump-${i}`} onClick={() => playSong(song)} className="flex flex-col w-[110px] shrink-0 cursor-pointer group active:scale-95 transition-all">
+                              <div className="relative w-[110px] h-[110px] mb-2 rounded-2xl overflow-hidden shadow-lg">
+                                <img src={song.thumbnail} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                {currentSong?.id === song.id && (
+                                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center" style={{ background: `${dominantColor}66` }}>
+                                    {isPlaying ? <Pause size={24} fill="white" className="text-white drop-shadow" /> : <Play size={24} fill="white" className="text-white drop-shadow ml-1" />}
+                                  </div>
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                              </div>
+                              <span className="text-white text-[11px] font-semibold truncate leading-tight">{song.title}</span>
+                              <span className="text-white/40 text-[10px] truncate mt-0.5">{song.artist}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Trending Now */}
+                    {trendingSongs.length > 0 && (
+                      <div className="mb-6">
+                        <div className="flex items-center justify-between mb-3">
+                          <h2 className="text-base font-bold text-white">🔥 Trending Now</h2>
+                          <span className="text-[10px] text-white/30 font-semibold">Tamil Hits</span>
+                        </div>
+                        <div className="flex overflow-x-auto gap-3 no-scrollbar pb-2">
+                          {trendingSongs.slice(0, 10).map((song, i) => (
+                            <div key={`trend-${i}`} onClick={() => playSong(song)} className="flex flex-col w-[130px] shrink-0 cursor-pointer group active:scale-95 transition-all">
+                              <div className="relative w-[130px] h-[130px] mb-2 rounded-2xl overflow-hidden shadow-lg">
+                                <img src={song.thumbnail} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm text-white text-[10px] font-black px-2 py-0.5 rounded-full">#{i + 1}</div>
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                              </div>
+                              <span className="text-white text-[11px] font-semibold truncate leading-tight">{song.title}</span>
+                              <span className="text-white/40 text-[10px] truncate mt-0.5">{song.artist}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Your Playlists */}
+                    {playlists.length > 0 && (
+                      <div className="mb-6">
+                        <div className="flex items-center justify-between mb-3">
+                          <h2 className="text-base font-bold text-white">Your Playlists</h2>
+                          <button onClick={() => setActiveTab('Playlists')} className="text-[10px] text-[#8cd92b] font-bold uppercase tracking-wider">See all</button>
+                        </div>
+                        <div className="flex overflow-x-auto gap-3 no-scrollbar pb-2">
+                          {playlists.map((pl, i) => (
+                            <div key={pl.id} onClick={() => { setCurrentViewPlaylist(pl); setActiveTab('PlaylistDetails'); }} className="flex flex-col w-[110px] shrink-0 cursor-pointer active:scale-95 transition-all">
+                              <div className="w-[110px] h-[110px] mb-2 rounded-2xl overflow-hidden shadow-lg bg-[#2a2a2a] flex items-center justify-center relative">
+                                {pl.songs.length > 0 ? (
+                                  <div className="grid grid-cols-2 w-full h-full">
+                                    {pl.songs.slice(0, 4).map((s, si) => <img key={si} src={s.thumbnail} alt="" className="w-full h-full object-cover" />)}
+                                  </div>
+                                ) : (
+                                  <div className={`w-full h-full bg-gradient-to-br ${['from-purple-600 to-blue-500', 'from-green-600 to-teal-500', 'from-orange-600 to-pink-500', 'from-red-600 to-yellow-500'][i % 4]} flex items-center justify-center`}>
+                                    <List size={32} className="text-white/80" />
+                                  </div>
+                                )}
+                              </div>
+                              <span className="text-white text-[11px] font-semibold truncate">{pl.name}</span>
+                              <span className="text-white/40 text-[10px] mt-0.5">{pl.songs.length} songs</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Suggestions for you (fallback songs) */}
+                    <div className="mb-24">
+                      <h2 className="text-base font-bold text-white mb-3">Suggested for You</h2>
+                      <div className="space-y-1">
+                        {fallbackSongs.slice(0, 10).map((song, i) => (
+                          <div key={`sugg-${song.id}`} onClick={() => playSong(song)} className="flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all active:scale-[0.98] active:bg-white/5 group">
+                            <div className="relative shrink-0">
+                              <img src={song.thumbnail} alt="" className="w-12 h-12 object-cover rounded-xl shadow-sm" />
+                              {currentSong?.id === song.id && isPlaying && (
+                                <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
+                                  <div className="flex gap-0.5 items-end h-4">
+                                    {[0,1,2].map(b => <div key={b} className="w-[3px] rounded-full animate-bounce" style={{ height: `${6+b*3}px`, backgroundColor: dominantColor, animationDelay: `${b*0.1}s` }} />)}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 overflow-hidden">
+                              <h4 className="text-white text-[13px] font-semibold truncate">{song.title}</h4>
+                              <p className="text-white/40 text-[11px] truncate mt-0.5">{song.artist}</p>
+                            </div>
+                            <button onClick={(e) => { e.stopPropagation(); toggleFavorite(e, song); }} className="p-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity active:opacity-100">
+                              <Heart size={16} fill={favoriteIds.has(song.id) ? dominantColor : 'none'} stroke={favoriteIds.has(song.id) ? dominantColor : 'currentColor'} className="text-white/40" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* FAVORITES VIEW */}
             {activeTab === 'Favorites' && (
