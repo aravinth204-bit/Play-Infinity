@@ -181,15 +181,15 @@ export default function App() {
   // ──────────────────────────────────────────────────────
   const NON_TAMIL_KEYWORDS = [
     // Hindi indicators
-    'hindi', 'bollywood', 'hindi', 'bhojpuri', 'rajasthani', 'haryanvi', 'punjabi', 'urdu',
+    'hindi', 'bollywood', 'bhojpuri', 'rajasthani', 'haryanvi', 'punjabi', 'urdu',
     // Telugu
     'telugu', 'tollywood', 'andhra',
     // Malayalam
     'malayalam', 'mollywood',
     // Kannada
     'kannada', 'sandalwood',
-    // General non-Tamil words that appear in song titles
-    'naa songs', 'naa oru', 'naa peru',
+    // Other
+    'sinhala', 'korean', 'naa songs', 'naa oru', 'naa peru'
   ];
 
   const isTamilSong = (song) => {
@@ -203,10 +203,11 @@ export default function App() {
     return songs.filter(s => {
       const t = s.title.toLowerCase();
       return !t.includes('jukebox') && !t.includes('mashup') && !t.includes('collection') &&
-        !t.includes('nonstop') && !t.includes('full album') && !t.includes('#short') &&
-        !t.includes('status') && !t.includes('news') && !t.includes('teaser') &&
-        !t.includes('trailer') && !t.includes('karaoke') && !t.includes('whatsapp') &&
-        !t.includes('ringtone');
+        !t.includes('nonstop') && !t.includes('full album') && !t.includes('short') &&
+        !t.includes('reels') && !t.includes('status') && !t.includes('news') &&
+        !t.includes('teaser') && !t.includes('trailer') && !t.includes('karaoke') &&
+        !t.includes('whatsapp') && !t.includes('ringtone') && !t.includes('8d') &&
+        !t.includes('interview') && !t.includes('podcast');
     });
   };
 
@@ -214,24 +215,24 @@ export default function App() {
   // FEATURE: Music Director Collections
   // ──────────────────────────────────────────────────────
   const MUSIC_DIRECTORS = [
-    { id: 'anirudh', name: 'Anirudh', query: 'Anirudh Ravichander tamil hit songs -jukebox -mashup -collection -nonstop', color: 'from-[#f97316] to-[#ef4444]', emoji: '🎸', subtitle: 'Music Director' },
-    { id: 'arrahman', name: 'A.R. Rahman', query: 'AR Rahman tamil hit songs -jukebox -mashup -collection -nonstop', color: 'from-[#6366f1] to-[#8b5cf6]', emoji: '🎹', subtitle: 'Music Director' },
-    { id: 'harris', name: 'Harris Jayaraj', query: 'Harris Jayaraj tamil hit songs -jukebox -mashup -collection -nonstop', color: 'from-[#0ea5e9] to-[#6366f1]', emoji: '🎻', subtitle: 'Music Director' },
-    { id: 'yuvan', name: 'Yuvan Shankar Raja', query: 'Yuvan Shankar Raja tamil hit songs -jukebox -mashup -collection -nonstop', color: 'from-[#10b981] to-[#0ea5e9]', emoji: '🎵', subtitle: 'Music Director' },
-    { id: 'deva', name: 'Deva', query: 'Deva tamil hit songs -jukebox -mashup -collection -nonstop', color: 'from-[#ec4899] to-[#f97316]', emoji: '🥁', subtitle: 'Music Director' },
-    { id: 'ilayaraja', name: 'Ilaiyaraaja', query: 'Ilaiyaraaja evergreen tamil hit songs -jukebox -mashup -collection -nonstop', color: 'from-[#f59e0b] to-[#ec4899]', emoji: '🎼', subtitle: 'Music Director' },
-    { id: 'gv', name: 'G.V. Prakash', query: 'GV Prakash Kumar tamil hit songs -jukebox -mashup -collection -nonstop', color: 'from-[#14b8a6] to-[#22c55e]', emoji: '🎤', subtitle: 'Music Director' },
-    { id: 'sid', name: 'Sid Sriram', query: 'Sid Sriram tamil hit songs -jukebox -mashup -collection -nonstop', color: 'from-[#a855f7] to-[#ec4899]', emoji: '🎧', subtitle: 'Top Singer' },
+    { id: 'anirudh', name: 'Anirudh', query: 'Anirudh Ravichander tamil hit songs -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#f97316] to-[#ef4444]', emoji: '🎸', subtitle: 'Music Director' },
+    { id: 'arrahman', name: 'A.R. Rahman', query: 'AR Rahman tamil hit songs -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#6366f1] to-[#8b5cf6]', emoji: '🎹', subtitle: 'Music Director' },
+    { id: 'harris', name: 'Harris Jayaraj', query: 'Harris Jayaraj tamil hit songs -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#0ea5e9] to-[#6366f1]', emoji: '🎻', subtitle: 'Music Director' },
+    { id: 'yuvan', name: 'Yuvan Shankar Raja', query: 'Yuvan Shankar Raja tamil hit songs -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#10b981] to-[#0ea5e9]', emoji: '🎵', subtitle: 'Music Director' },
+    { id: 'deva', name: 'Deva', query: 'Deva tamil hit songs -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#ec4899] to-[#f97316]', emoji: '🥁', subtitle: 'Music Director' },
+    { id: 'ilayaraja', name: 'Ilaiyaraaja', query: 'Ilaiyaraaja evergreen tamil hit songs -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#f59e0b] to-[#ec4899]', emoji: '🎼', subtitle: 'Music Director' },
+    { id: 'gv', name: 'G.V. Prakash', query: 'GV Prakash Kumar tamil hit songs -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#14b8a6] to-[#22c55e]', emoji: '🎤', subtitle: 'Music Director' },
+    { id: 'sid', name: 'Sid Sriram', query: 'Sid Sriram tamil hit songs -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#a855f7] to-[#ec4899]', emoji: '🎧', subtitle: 'Top Singer' },
   ];
 
   // ──────────────────────────────────────────────────────
   // FEATURE: Era Collections (80s, 90s, 2k)
   // ──────────────────────────────────────────────────────
   const ERA_COLLECTIONS = [
-    { id: '2024 hits', name: 'Trending Now', query: 'latest tamil hit songs 2024 -jukebox -mashup -collection -nonstop', color: 'from-[#ff007f] to-[#ff7f00]', emoji: '🔥', subtitle: 'Current Hits' },
-    { id: '2k', name: '2k Kids', query: '2000s tamil hit songs evergreen -jukebox -mashup -collection -nonstop', color: 'from-[#00f2fe] to-[#4facfe]', emoji: '🎧', subtitle: 'Nostalgia' },
-    { id: '90s', name: '90s Hits', query: '90s tamil hit songs evergreen -jukebox -mashup -collection -nonstop', color: 'from-[#f6d365] to-[#fda085]', emoji: '📼', subtitle: 'Golden Era' },
-    { id: '80s', name: '80s Classics', query: '80s tamil hit songs evergreen -jukebox -mashup -collection -nonstop', color: 'from-[#d4fc79] to-[#96e6a1]', emoji: '📻', subtitle: 'Retro Classics' },
+    { id: '2024 hits', name: 'Trending Now', query: 'latest tamil hit songs 2024 -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#ff007f] to-[#ff7f00]', emoji: '🔥', subtitle: 'Current Hits' },
+    { id: '2k', name: '2k Kids', query: '2000s tamil hit songs evergreen -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#00f2fe] to-[#4facfe]', emoji: '🎧', subtitle: 'Nostalgia' },
+    { id: '90s', name: '90s Hits', query: '90s tamil hit songs evergreen -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#f6d365] to-[#fda085]', emoji: '📼', subtitle: 'Golden Era' },
+    { id: '80s', name: '80s Classics', query: '80s tamil hit songs evergreen -jukebox -mashup -collection -nonstop -shorts -reels -status', color: 'from-[#d4fc79] to-[#96e6a1]', emoji: '📻', subtitle: 'Retro Classics' },
   ];
 
   const [directorSongs, setDirectorSongs] = useState([]);
