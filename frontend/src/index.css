@@ -8,7 +8,7 @@
 
 @layer base {
   body {
-    @apply bg-gradient-to-br from-[#ffdada] to-[#e6e6e6] text-[#333] font-sans antialiased min-h-screen m-0 select-none;
+    @apply bg-[#121212] text-white font-sans antialiased min-h-screen m-0 select-none;
     font-family: 'Inter', system-ui, sans-serif;
   }
 }
@@ -99,4 +99,40 @@
 
 .animate-float {
   animation: float-heart 0.8s ease-out forwards;
+}
+
+/* Custom Player Animations */
+@keyframes progress-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.progress-glow {
+  background: linear-gradient(90deg, #1ed760 0%, #8cd92b 50%, #1ed760 100%);
+  background-size: 200% 100%;
+  animation: progress-shimmer 2s infinite linear;
+  box-shadow: 0 0 15px rgba(140, 217, 43, 0.6);
+}
+
+@keyframes slow-pulse {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.03);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-slow-pulse {
+  animation: slow-pulse 8s ease-in-out infinite;
 }
