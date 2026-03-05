@@ -214,14 +214,24 @@ export default function App() {
   // FEATURE: Music Director Collections
   // ──────────────────────────────────────────────────────
   const MUSIC_DIRECTORS = [
-    { id: 'anirudh', name: 'Anirudh', query: 'Anirudh Ravichander tamil songs audio', color: 'from-[#f97316] to-[#ef4444]', emoji: '🎸' },
-    { id: 'arrahman', name: 'A.R. Rahman', query: 'AR Rahman tamil songs audio', color: 'from-[#6366f1] to-[#8b5cf6]', emoji: '🎹' },
-    { id: 'harris', name: 'Harris Jayaraj', query: 'Harris Jayaraj tamil songs audio', color: 'from-[#0ea5e9] to-[#6366f1]', emoji: '🎻' },
-    { id: 'yuvan', name: 'Yuvan Shankar Raja', query: 'Yuvan Shankar Raja tamil songs audio', color: 'from-[#10b981] to-[#0ea5e9]', emoji: '🎵' },
-    { id: 'deva', name: 'Deva', query: 'Deva tamil songs audio', color: 'from-[#ec4899] to-[#f97316]', emoji: '🥁' },
-    { id: 'ilayaraja', name: 'Ilaiyaraaja', query: 'Ilaiyaraaja evergreen tamil songs audio', color: 'from-[#f59e0b] to-[#ec4899]', emoji: '🎼' },
-    { id: 'gv', name: 'G.V. Prakash', query: 'GV Prakash Kumar tamil songs audio', color: 'from-[#14b8a6] to-[#22c55e]', emoji: '🎤' },
-    { id: 'sid', name: 'Sid Sriram', query: 'Sid Sriram tamil songs audio', color: 'from-[#a855f7] to-[#ec4899]', emoji: '🎧' },
+    { id: 'anirudh', name: 'Anirudh', query: 'Anirudh Ravichander tamil hit songs -jukebox -mashup -collection -nonstop', color: 'from-[#f97316] to-[#ef4444]', emoji: '🎸', subtitle: 'Music Director' },
+    { id: 'arrahman', name: 'A.R. Rahman', query: 'AR Rahman tamil hit songs -jukebox -mashup -collection -nonstop', color: 'from-[#6366f1] to-[#8b5cf6]', emoji: '🎹', subtitle: 'Music Director' },
+    { id: 'harris', name: 'Harris Jayaraj', query: 'Harris Jayaraj tamil hit songs -jukebox -mashup -collection -nonstop', color: 'from-[#0ea5e9] to-[#6366f1]', emoji: '🎻', subtitle: 'Music Director' },
+    { id: 'yuvan', name: 'Yuvan Shankar Raja', query: 'Yuvan Shankar Raja tamil hit songs -jukebox -mashup -collection -nonstop', color: 'from-[#10b981] to-[#0ea5e9]', emoji: '🎵', subtitle: 'Music Director' },
+    { id: 'deva', name: 'Deva', query: 'Deva tamil hit songs -jukebox -mashup -collection -nonstop', color: 'from-[#ec4899] to-[#f97316]', emoji: '🥁', subtitle: 'Music Director' },
+    { id: 'ilayaraja', name: 'Ilaiyaraaja', query: 'Ilaiyaraaja evergreen tamil hit songs -jukebox -mashup -collection -nonstop', color: 'from-[#f59e0b] to-[#ec4899]', emoji: '🎼', subtitle: 'Music Director' },
+    { id: 'gv', name: 'G.V. Prakash', query: 'GV Prakash Kumar tamil hit songs -jukebox -mashup -collection -nonstop', color: 'from-[#14b8a6] to-[#22c55e]', emoji: '🎤', subtitle: 'Music Director' },
+    { id: 'sid', name: 'Sid Sriram', query: 'Sid Sriram tamil hit songs -jukebox -mashup -collection -nonstop', color: 'from-[#a855f7] to-[#ec4899]', emoji: '🎧', subtitle: 'Top Singer' },
+  ];
+
+  // ──────────────────────────────────────────────────────
+  // FEATURE: Era Collections (80s, 90s, 2k)
+  // ──────────────────────────────────────────────────────
+  const ERA_COLLECTIONS = [
+    { id: '2024 hits', name: 'Trending Now', query: 'latest tamil hit songs 2024 -jukebox -mashup -collection -nonstop', color: 'from-[#ff007f] to-[#ff7f00]', emoji: '🔥', subtitle: 'Current Hits' },
+    { id: '2k', name: '2k Kids', query: '2000s tamil hit songs evergreen -jukebox -mashup -collection -nonstop', color: 'from-[#00f2fe] to-[#4facfe]', emoji: '🎧', subtitle: 'Nostalgia' },
+    { id: '90s', name: '90s Hits', query: '90s tamil hit songs evergreen -jukebox -mashup -collection -nonstop', color: 'from-[#f6d365] to-[#fda085]', emoji: '📼', subtitle: 'Golden Era' },
+    { id: '80s', name: '80s Classics', query: '80s tamil hit songs evergreen -jukebox -mashup -collection -nonstop', color: 'from-[#d4fc79] to-[#96e6a1]', emoji: '📻', subtitle: 'Retro Classics' },
   ];
 
   const [directorSongs, setDirectorSongs] = useState([]);
@@ -1262,6 +1272,33 @@ export default function App() {
                       </div>
                     </div>
 
+                    {/* 🕰️ Era Collections */}
+                    <div className="mb-6">
+                      <div className="flex items-center justify-between mb-3">
+                        <h2 className="text-base font-bold text-white">🕰️ Time Travel</h2>
+                        <span className="text-[10px] text-[#8cd92b] font-semibold uppercase tracking-wider">Evergreen</span>
+                      </div>
+                      <div className="flex overflow-x-auto gap-3 no-scrollbar pb-2">
+                        {ERA_COLLECTIONS.map((era) => (
+                          <div
+                            key={era.id}
+                            onClick={() => fetchDirectorSongs(era)}
+                            className="flex-shrink-0 w-[140px] h-[72px] rounded-2xl relative overflow-hidden cursor-pointer active:scale-95 transition-all shadow-lg"
+                          >
+                            <div className={`absolute inset-0 bg-gradient-to-r ${era.color} opacity-80`} />
+                            <div className="absolute inset-0 bg-black/20" />
+                            <div className="absolute inset-0 flex items-center justify-between px-4">
+                              <div>
+                                <h3 className="text-white font-black text-sm italic">{era.name}</h3>
+                                <p className="text-white/80 text-[10px] font-bold">{era.subtitle}</p>
+                              </div>
+                              <span className="text-2xl drop-shadow-md">{era.emoji}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* Jump Back In */}
                     {(searchHistory.length > 0 || listenHistory.length > 0) && (
                       <div className="mb-6">
@@ -1454,7 +1491,7 @@ export default function App() {
                       {selectedDirector.emoji}
                     </div>
                     <div>
-                      <p className="text-white/50 text-[10px] uppercase tracking-widest font-bold mb-1">🎬 Music Director</p>
+                      <p className="text-white/50 text-[10px] uppercase tracking-widest font-bold mb-1">✨ {selectedDirector.subtitle || 'Collection'}</p>
                       <h1 className="text-2xl font-black text-white">{selectedDirector.name}</h1>
                       <p className="text-white/40 text-xs mt-0.5">{directorSongs.length > 0 ? `${directorSongs.length} songs` : 'Loading...'}</p>
                     </div>
