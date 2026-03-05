@@ -242,7 +242,7 @@ export default function App() {
     {
       id: 'trending_now',
       name: 'Trending Now',
-      query: 'tamil songs 2024 2025 Anirudh GV Prakash Yuvan trending hit -jukebox -mashup -nonstop -shorts -reels -status -interview -teaser -trailer -ringtone',
+      query: 'Anirudh Yuvan tamil hit songs 2024 audio -jukebox -mashup -nonstop -shorts -reels -status -teaser -trailer',
       color: 'from-[#ff007f] to-[#ff7f00]',
       emoji: '🔥',
       subtitle: 'Current Hits'
@@ -250,7 +250,7 @@ export default function App() {
     {
       id: '2k_kids',
       name: '2K Kids',
-      query: 'tamil hit songs 2016 2017 2018 2019 2020 2021 2022 2023 Mersal Bigil Master Beast Vikram Jailer -jukebox -mashup -nonstop -shorts -reels -status -interview -teaser -trailer -ringtone',
+      query: 'Anirudh tamil hit songs Mersal Bigil Vikram audio -jukebox -mashup -nonstop -shorts -reels -status -teaser',
       color: 'from-[#00f2fe] to-[#4facfe]',
       emoji: '🎧',
       subtitle: 'After 2015'
@@ -258,7 +258,7 @@ export default function App() {
     {
       id: '90s_hits',
       name: '90s Hits',
-      query: 'tamil evergreen songs 1990s 2000s Roja Bombay Kadhal Desam Gentleman Kadhalan Muthu Enthiran -jukebox -mashup -nonstop -shorts -reels -status -interview -teaser -trailer -ringtone',
+      query: 'AR Rahman 90s tamil songs Roja Bombay Kadhal audio -jukebox -mashup -nonstop -shorts -reels -status',
       color: 'from-[#f6d365] to-[#fda085]',
       emoji: '📼',
       subtitle: '1990 – 2015'
@@ -266,7 +266,7 @@ export default function App() {
     {
       id: '80s_classics',
       name: '80s Classics',
-      query: 'tamil classic songs Ilaiyaraaja 1980s Moodu Pani Ninaithale Innikkum Ninaive Oru Sangeetham Punnagai Mannan Agni Natchathiram -jukebox -mashup -nonstop -shorts -reels -status -interview -teaser -trailer -ringtone',
+      query: 'Ilaiyaraaja classic 80s tamil film songs -jukebox -mashup -nonstop -shorts -reels -status',
       color: 'from-[#d4fc79] to-[#96e6a1]',
       emoji: '📻',
       subtitle: 'Before 1990'
