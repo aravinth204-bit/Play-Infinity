@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-// Build ID: 2026-03-03-2225 (Vercel Fix)
+// Build ID: 2026-03-05-MEGAUPDATE
 import ReactPlayer from 'react-player';
-import { Home, Music, Search, User, Play, Pause, SkipBack, SkipForward, Heart, MoreHorizontal, ArrowLeft, Shuffle, Repeat, Upload, List, Headphones, Book, Download, Clock, Settings, LogOut, Bell, ChevronRight, ChevronUp, Plus, X, FolderPlus, Mic2 } from 'lucide-react';
+import { Home, Music, Search, User, Play, Pause, SkipBack, SkipForward, Heart, MoreHorizontal, ArrowLeft, Shuffle, Repeat, Upload, List, Headphones, Book, Download, Clock, Settings, LogOut, Bell, ChevronRight, ChevronUp, ChevronDown, Plus, X, FolderPlus, Mic2, Share2, Wifi, WifiOff, History, Gauge, CheckCircle2 } from 'lucide-react';
 import { formatTime } from './utils';
 
 const AnimatedHeart = ({ isFavorite, onClick, className = '', size = 16 }) => {
@@ -45,12 +45,23 @@ const AnimatedHeart = ({ isFavorite, onClick, className = '', size = 16 }) => {
   );
 };
 
+const SkeletonRow = () => (
+  <div className="flex items-center gap-3 p-2">
+    <div className="w-12 h-12 rounded-md skeleton shrink-0" />
+    <div className="flex-1 space-y-2">
+      <div className="h-4 w-3/4 rounded-sm skeleton" />
+      <div className="h-3 w-1/2 rounded-sm skeleton" />
+    </div>
+  </div>
+);
+
 // Global audio element for background play
 const backgroundAudio = typeof window !== 'undefined' ? new Audio() : null;
 if (backgroundAudio) {
   backgroundAudio.id = "play-infinity-core-audio";
   backgroundAudio.style.display = 'none';
   backgroundAudio.setAttribute('playsinline', 'true');
+  backgroundAudio.crossOrigin = "anonymous"; // CRITICAL for Equalizer analysis
 }
 
 const DesktopSongRow = React.memo(function DesktopSongRow({
@@ -63,10 +74,10 @@ const DesktopSongRow = React.memo(function DesktopSongRow({
   return (
     <div
       onClick={onSelect}
-      className="flex items-center gap-4 hover:bg-[#1a1c2a] p-3 rounded-2xl cursor-pointer transition-all border border-transparent hover:border-[#262837]"
+      className="flex items-center gap-4 hover:bg-[#1a1c2a] p-3 rounded-2xl cursor-pointer transition-all border border-transparent hover:border-[#262837] group hover:scale-[1.01] active:scale-[0.99]"
     >
       {index != null && (
-        <span className="text-gray-500 font-bold text-sm w-6 text-center opacity-70">{String(index + 1).padStart(2, '0')}</span>
+        <span className="text-gray-500 font-bold text-sm w-6 text-center opacity-70 group-hover:text-[#8cd92b] transition-colors">{String(index + 1).padStart(2, '0')}</span>
       )}
       <img src={song.thumbnail} alt={song.title} className="w-12 h-12 rounded-xl object-cover shadow-sm" />
       <div className="flex-1 overflow-hidden pr-4">
@@ -124,7 +135,99 @@ export default function App() {
   const [sleepTimer, setSleepTimer] = useState(null);
   const [sleepMinutesLeft, setSleepMinutesLeft] = useState(0);
   const [showSleepModal, setShowSleepModal] = useState(false);
+  const [isLyricsVisible, setIsLyricsVisible] = useState(false);
   const sleepTimerRef = useRef(null);
+
+  // FEATURE: Dynamic UI & Audio Visualizer
+  const [dominantColor, setDominantColor] = useState('#1ed760');
+  const [audioData, setAudioData] = useState(new Uint8Array(32).fill(0));
+  const analyserRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const sourceRef = useRef(null);
+
+  // FEATURE: Toast Notifications
+  const [toasts, setToasts] = useState([]);
+  const showToast = useCallback((message, type = 'info', icon = null) => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type, icon }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000);
+  }, []);
+
+  // FEATURE: Offline Indicator
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  // FEATURE: Playback Speed
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+
+  // FEATURE: Listen History (separate from search history)
+  const [listenHistory, setListenHistory] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('listenHistory') || '[]'); } catch { return []; }
+  });
+
+  // FEATURE: Queue Persistence
+  useEffect(() => {
+    try {
+      const savedQueue = JSON.parse(localStorage.getItem('savedQueue') || '[]');
+      const savedSong = JSON.parse(localStorage.getItem('savedCurrentSong') || 'null');
+      if (savedQueue.length > 0) setQueue(savedQueue);
+      // Don't auto-play saved song — just restore it silently
+      if (savedSong) setCurrentSong(savedSong);
+    } catch { }
+  }, []);
+
+  const getColorFromImage = (url) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "Anonymous";
+      img.src = url;
+      img.onload = () => {
+        try {
+          const size = 50;
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = size;
+          canvas.height = size;
+          ctx.drawImage(img, 0, 0, size, size);
+          const data = ctx.getImageData(0, 0, size, size).data;
+
+          let bestR = 30, bestG = 215, bestB = 96; // fallback green
+          let bestScore = -1;
+
+          // Sample pixels and find the most vibrant/bright non-dark one
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i], g = data[i + 1], b = data[i + 2];
+            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            const saturation = max === 0 ? 0 : (max - min) / max;
+            // Prefer bright + saturated colors, skip near-black
+            if (brightness > 60 && saturation > 0.2) {
+              const score = brightness * 0.4 + saturation * 200;
+              if (score > bestScore) {
+                bestScore = score;
+                bestR = r; bestG = g; bestB = b;
+              }
+            }
+          }
+
+          // If still too dark, boost it
+          const brightness = (bestR * 299 + bestG * 587 + bestB * 114) / 1000;
+          if (brightness < 80) {
+            const boost = 80 / Math.max(brightness, 1);
+            bestR = Math.min(255, Math.round(bestR * boost));
+            bestG = Math.min(255, Math.round(bestG * boost));
+            bestB = Math.min(255, Math.round(bestB * boost));
+          }
+
+          resolve(`rgb(${bestR}, ${bestG}, ${bestB})`);
+        } catch {
+          resolve('#1ed760');
+        }
+      };
+      img.onerror = () => resolve('#1ed760');
+    });
+  };
 
   const normalizeTitleKey = (title = '') => {
     const stopWords = new Set([
@@ -186,6 +289,63 @@ export default function App() {
 
 
 
+  // FEATURE: Offline detection
+  useEffect(() => {
+    const goOnline = () => { setIsOnline(true); showToast('Back online! 🌐', 'success'); };
+    const goOffline = () => { setIsOnline(false); showToast('No internet connection 📵', 'error'); };
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => { window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); };
+  }, [showToast]);
+
+  // FEATURE: Listen History persistence
+  useEffect(() => {
+    localStorage.setItem('listenHistory', JSON.stringify(listenHistory.slice(0, 50)));
+  }, [listenHistory]);
+
+  // FEATURE: Queue persistence
+  useEffect(() => {
+    localStorage.setItem('savedQueue', JSON.stringify(queue.slice(0, 30)));
+  }, [queue]);
+
+  useEffect(() => {
+    if (currentSong) localStorage.setItem('savedCurrentSong', JSON.stringify(currentSong));
+  }, [currentSong]);
+
+  // Visualization Loop
+  useEffect(() => {
+    let animationFrame;
+    const update = () => {
+      if (isPlaying && analyserRef.current) {
+        const binCount = analyserRef.current.frequencyBinCount || 32;
+        const dataArray = new Uint8Array(binCount);
+        analyserRef.current.getByteFrequencyData(dataArray);
+
+        const sum = dataArray.reduce((acc, val) => acc + val, 0);
+        if (sum < 10) {
+          // Rhythmic fallback for CORS scenarios
+          const mock = new Uint8Array(32).map((_, i) => {
+            const pulse = Math.sin(Date.now() / 150 + i * 0.5) * 20;
+            const wave = Math.sin(Date.now() / 1000 + i * 0.2) * 10;
+            return 80 + pulse + wave + Math.random() * 15;
+          });
+          setAudioData(mock);
+        } else {
+          setAudioData(dataArray);
+        }
+      } else {
+        // Subtle resting pulse when paused or no analyser
+        const restingMode = new Uint8Array(32).map((_, i) => {
+          return 25 + Math.sin(Date.now() / 1000 + i * 0.3) * 8;
+        });
+        setAudioData(restingMode);
+      }
+      animationFrame = requestAnimationFrame(update);
+    };
+    update();
+    return () => cancelAnimationFrame(animationFrame);
+  }, [isPlaying]);
+
   useEffect(() => {
     localStorage.setItem('musicHistory', JSON.stringify(searchHistory));
   }, [searchHistory]);
@@ -211,7 +371,11 @@ export default function App() {
     if (e) e.stopPropagation();
     setFavorites(prev => {
       const exists = prev.some(s => s.id === song.id);
-      if (exists) return prev.filter(s => s.id !== song.id);
+      if (exists) {
+        showToast('Removed from Liked Songs', 'info');
+        return prev.filter(s => s.id !== song.id);
+      }
+      showToast('Added to Liked Songs ❤️', 'success');
       return [song, ...prev].slice(0, 100);
     });
   };
@@ -226,16 +390,19 @@ export default function App() {
     };
     setPlaylists(prev => [...prev, newPlaylist]);
     setNewPlaylistName('');
+    showToast(`Playlist "${newPlaylistName.trim()}" created! 🎵`, 'success');
   };
 
   const addToPlaylist = (playlistId, song) => {
+    const pl = playlists.find(p => p.id === playlistId);
     setPlaylists(prev => prev.map(p => {
       if (p.id === playlistId) {
-        if (p.songs.some(s => s.id === song.id)) return p;
+        if (p.songs.some(s => s.id === song.id)) { showToast('Already in playlist!', 'info'); return p; }
         return { ...p, songs: [song, ...p.songs] };
       }
       return p;
     }));
+    if (pl && !pl.songs.some(s => s.id === song.id)) showToast(`Added to "${pl?.name}" 🎶`, 'success');
     setShowPlaylistModal({ isOpen: false, songInfo: null });
   };
 
@@ -551,6 +718,34 @@ export default function App() {
     }
   };
   const playSong = async (song, fromQueue = false) => {
+    // Extract color for dynamic background
+    getColorFromImage(song.thumbnail).then(color => setDominantColor(color));
+
+    // Audio Visualization Setup
+    try {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        analyserRef.current = audioCtxRef.current.createAnalyser();
+        analyserRef.current.fftSize = 64;
+        analyserRef.current.smoothingTimeConstant = 0.8;
+      }
+
+      if (backgroundAudio && !sourceRef.current && audioCtxRef.current) {
+        try {
+          sourceRef.current = audioCtxRef.current.createMediaElementSource(backgroundAudio);
+          sourceRef.current.connect(analyserRef.current);
+          analyserRef.current.connect(audioCtxRef.current.destination);
+        } catch (e) {
+          console.warn("Source connection handled:", e);
+        }
+      }
+      if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume();
+      }
+    } catch (err) {
+      console.warn("Audio visualization setup failed:", err);
+    }
+
     setCurrentSong(song);
     setIsPlaying(true);
     setActiveTab('Music');
@@ -558,6 +753,12 @@ export default function App() {
 
     sessionPlayedIds.current.add(song.id);
     addPlayedTitleTokens(song.title);
+
+    // Track listen history
+    setListenHistory(prev => {
+      const filtered = prev.filter(s => s.id !== song.id);
+      return [{ ...song, playedAt: Date.now() }, ...filtered].slice(0, 50);
+    });
 
     setSearchHistory(prev => {
       const filtered = prev.filter(s => s.id !== song.id);
@@ -586,6 +787,25 @@ export default function App() {
     if (!currentSong) return;
     setIsPlaying(!isPlaying);
   };
+
+  // FEATURE: Share Song
+  const shareSong = async (song) => {
+    if (!song) return;
+    const shareData = {
+      title: song.title,
+      text: `🎵 Listening to "${song.title}" by ${song.artist} on ISAI`,
+      url: `https://www.youtube.com/watch?v=${song.id}`
+    };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(`${shareData.text}\n${shareData.url}`);
+        showToast('Link copied to clipboard! 📋', 'success');
+      }
+    } catch { }
+  };
+
 
   const handleProgress = (state) => {
     setProgress(state.playedSeconds);
@@ -770,6 +990,25 @@ export default function App() {
   const hasActiveSearchResults = searchQuery.trim().length > 0 && songs.length > 0;
   const shouldShowQueue = Boolean(currentSong) && !hasActiveSearchResults;
 
+  // FEATURE: Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e) => {
+      const tag = e.target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.code === 'Space') { e.preventDefault(); if (currentSong) setIsPlaying(p => !p); }
+      if (e.code === 'ArrowRight') { e.preventDefault(); const np = Math.min(progress + 10, duration); setProgress(np); if (backgroundAudio) backgroundAudio.currentTime = np; }
+      if (e.code === 'ArrowLeft') { e.preventDefault(); const np = Math.max(progress - 10, 0); setProgress(np); if (backgroundAudio) backgroundAudio.currentTime = np; }
+      if (e.code === 'KeyN') { e.preventDefault(); playNext(); }
+      if (e.code === 'KeyB') { e.preventDefault(); playPrev(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [currentSong, progress, duration]);
+
+  // FEATURE: Swipe gestures on Now Playing
+  const swipeTouchStartX = useRef(null);
+  const swipeTouchStartY = useRef(null);
+
   // backgroundAudio setup and event handlers
   useEffect(() => {
     if (backgroundAudio) {
@@ -826,14 +1065,30 @@ export default function App() {
       {/* App Container - Mobile Layout (Dark Theme) */}
       <div className="w-full h-full max-w-[450px] bg-[#121212] shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden flex flex-col md:hidden text-[#a0a3b1] sm:rounded-none sm:scale-100">
 
+        {/* Toast Notifications */}
+        <div className="absolute top-4 left-0 right-0 z-[100] flex flex-col items-center gap-2 pointer-events-none px-4">
+          {toasts.map(toast => (
+            <div key={toast.id} className={`flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl backdrop-blur-xl text-sm font-bold animate-slide-up-premium pointer-events-auto border ${toast.type === 'success' ? 'bg-[#1a2e1a]/90 border-[#8cd92b]/30 text-[#8cd92b]' : toast.type === 'error' ? 'bg-[#2e1a1a]/90 border-red-500/30 text-red-400' : 'bg-[#1a1a2e]/90 border-white/10 text-white/80'}`}>
+              {toast.type === 'success' ? <CheckCircle2 size={16} /> : toast.type === 'error' ? <WifiOff size={16} /> : <Bell size={16} />}
+              <span>{toast.message}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Offline Banner */}
+        {!isOnline && (
+          <div className="absolute top-0 left-0 right-0 z-[90] bg-red-600/90 backdrop-blur-sm text-white text-xs font-bold text-center py-2 flex items-center justify-center gap-2">
+            <WifiOff size={12} /> No internet connection
+          </div>
+        )}
 
 
         {/* Mobile Main Content Area */}
         {activeTab !== 'Music' && (
-          <div className="flex-1 overflow-y-auto no-scrollbar pb-20">
+          <div className="flex-1 overflow-y-auto no-scrollbar pb-20 overscroll-contain scroll-smooth">
             {/* HOME VIEW */}
             {activeTab === 'Home' && (
-              <div className="p-4 pt-10 overflow-x-hidden" style={{ background: 'linear-gradient(to bottom, #1e1e1e 0%, #121212 250px)' }}>
+              <div className="p-4 pt-10 overflow-x-hidden animate-fade-in animate-slide-up-premium" style={{ background: `linear-gradient(to bottom, ${dominantColor}33 0%, #121212 350px)` }}>
                 {/* Top Header */}
                 <div className="flex items-center justify-between mb-8 relative z-10 px-1 pt-2">
                   <div className="flex items-center gap-3">
@@ -844,8 +1099,8 @@ export default function App() {
                     <button onClick={() => setActiveTab('Search')} className="p-2.5 bg-[#2a2a2a] text-white rounded-full hover:bg-[#3e3e3e] transition-colors shadow-sm">
                       <Search size={22} />
                     </button>
-                    <button className="p-2.5 bg-[#2a2a2a] text-white rounded-full hover:bg-[#3e3e3e] transition-colors shadow-sm">
-                      <Settings size={22} />
+                    <button onClick={() => setActiveTab('History')} className="p-2.5 bg-[#2a2a2a] text-white rounded-full hover:bg-[#3e3e3e] transition-colors shadow-sm">
+                      <History size={22} />
                     </button>
                   </div>
                 </div>
@@ -893,8 +1148,8 @@ export default function App() {
 
             {/* FAVORITES VIEW */}
             {activeTab === 'Favorites' && (
-              <div className="overflow-x-hidden min-h-screen bg-[#121212]">
-                <div className="px-5 pt-12 pb-6 flex flex-col justify-end" style={{ background: 'linear-gradient(to bottom, #4f338d 0%, #2b1d4c 100%)' }}>
+              <div className="overflow-x-hidden min-h-screen bg-[#121212] animate-fade-in animate-slide-up-premium">
+                <div className="px-5 pt-12 pb-6 flex flex-col justify-end" style={{ background: `linear-gradient(to bottom, ${dominantColor}dd 0%, #121212 100%)` }}>
                   <div onClick={() => setActiveTab('Home')} className="mb-6 bg-black/20 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer hover:bg-black/40">
                     <ArrowLeft size={20} className="text-white" />
                   </div>
@@ -911,7 +1166,7 @@ export default function App() {
 
             {/* SEARCH VIEW */}
             {activeTab === 'Search' && (
-              <div className="p-4 pt-10 flex flex-col h-full bg-[#121212]">
+              <div className="p-4 pt-10 flex flex-col h-full bg-[#121212] animate-fade-in animate-slide-up-premium">
                 <h1 className="text-2xl font-bold text-white mb-6">Search</h1>
                 <form onSubmit={searchYoutube} className="mb-6 shrink-0">
                   <div className="relative">
@@ -931,10 +1186,36 @@ export default function App() {
                   </div>
                 </form>
 
-                <div className="flex-1 overflow-y-auto no-scrollbar pb-24">
+                <div className="flex-1 overflow-y-auto no-scrollbar pb-24 overscroll-contain">
+                  {songs.length === 0 && searchHistory.length > 0 && (
+                    <div className="mb-8 mt-2 px-1 animate-fade-in">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-bold text-white/80 lowercase tracking-wider">Recent Searches</h3>
+                        <button
+                          onClick={() => { setSearchHistory([]); localStorage.removeItem('musicHistory'); }}
+                          className="text-[10px] uppercase font-bold text-[#8cd92b] hover:opacity-70 transition-opacity"
+                        >
+                          Clear All
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {searchHistory.slice(0, 6).map((item, i) => (
+                          <div
+                            key={i}
+                            onClick={() => { setSearchQuery(item.title || item); searchYoutube(null, item.title || item); }}
+                            className="bg-[#2a2a2a] px-4 py-2 rounded-full text-sm text-white border border-[#3e3e3e]/50 flex items-center gap-2 hover:bg-[#3e3e3e] transition-colors active:scale-95"
+                          >
+                            <Clock size={12} className="text-gray-500" />
+                            <span className="truncate max-w-[120px]">{item.title || item}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {loading ? (
-                    <div className="flex items-center justify-center py-20">
-                      <div className="w-8 h-8 border-2 border-[#8cd92b] border-t-transparent rounded-full animate-spin"></div>
+                    <div className="space-y-2 mt-4 px-1">
+                      {[...Array(6)].map((_, i) => <SkeletonRow key={i} />)}
                     </div>
                   ) : (
                     <>
@@ -943,7 +1224,7 @@ export default function App() {
                       </h3>
                       <div className="space-y-1">
                         {(songs.length > 0 ? songs : displaySongs).map((song) => (
-                          <div key={song.id} onClick={() => playSong(song)} className="flex items-center gap-3 p-2 hover:bg-[#ffffff0a] rounded-md cursor-pointer transition-colors">
+                          <div key={song.id} onClick={() => playSong(song)} className="flex items-center gap-3 p-2 hover:bg-[#ffffff0a] rounded-md cursor-pointer transition-all active:scale-[0.98] active:opacity-80">
                             <img src={song.thumbnail} alt="" className="w-12 h-12 object-cover shrink-0 rounded-md shadow-sm" />
                             <div className="flex-1 overflow-hidden">
                               <h4 className="font-semibold text-white text-[14px] truncate">{song.title}</h4>
@@ -1011,19 +1292,76 @@ export default function App() {
           </div>
         )}
 
+        {/* LISTEN HISTORY VIEW */}
+        {activeTab === 'History' && (
+          <div className="flex flex-col flex-1 overflow-hidden animate-fade-in">
+            <div className="px-5 pt-12 pb-6" style={{ background: `linear-gradient(to bottom, ${dominantColor}44 0%, #121212 100%)` }}>
+              <button onClick={() => setActiveTab('Home')} className="mb-4 w-8 h-8 bg-black/20 rounded-full flex items-center justify-center">
+                <ArrowLeft size={18} className="text-white" />
+              </button>
+              <h1 className="text-3xl font-bold text-white">Recently Played</h1>
+              <p className="text-sm text-white/60 mt-1">{listenHistory.length} songs</p>
+            </div>
+            <div className="flex-1 overflow-y-auto no-scrollbar pb-24 px-4 space-y-1">
+              {listenHistory.length === 0 ? (
+                <div className="flex flex-col items-center justify-center pt-20 text-center opacity-40">
+                  <History size={48} className="mb-4 text-gray-500" />
+                  <p className="text-white font-bold">No history yet</p>
+                  <p className="text-gray-500 text-sm mt-1">Play a song to see it here</p>
+                </div>
+              ) : (
+                listenHistory.map((song, idx) => (
+                  <div key={`${song.id}-${idx}`} onClick={() => playSong(song)} className="flex items-center gap-3 p-2 hover:bg-[#ffffff0a] rounded-md cursor-pointer transition-all active:scale-[0.98]">
+                    <div className="relative shrink-0">
+                      <img src={song.thumbnail} alt="" className="w-12 h-12 object-cover rounded-md shadow-sm" />
+                      {currentSong?.id === song.id && isPlaying && (
+                        <div className="absolute inset-0 bg-black/50 rounded-md flex items-center justify-center">
+                          <div className="flex gap-0.5 items-end h-4">
+                            {[0, 1, 2].map(b => <div key={b} className="w-1 rounded-full animate-bounce bg-[#8cd92b]" style={{ height: `${8 + b * 4}px`, animationDelay: `${b * 0.1}s` }} />)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 overflow-hidden">
+                      <h4 className="font-semibold text-white text-[14px] truncate">{song.title}</h4>
+                      <p className="text-[12px] text-[#a0a0a0] truncate mt-0.5">{song.artist}</p>
+                    </div>
+                    <p className="text-[10px] text-gray-600 shrink-0">
+                      {song.playedAt ? new Date(song.playedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
         {/* NOW PLAYING VIEW */}
         {activeTab === 'Music' && (
-          <div className="flex flex-col flex-1 bg-[#121212] relative h-full">
+          <div
+            className="flex flex-col flex-1 bg-[#121212] relative h-full"
+            onTouchStart={(e) => { swipeTouchStartX.current = e.touches[0].clientX; swipeTouchStartY.current = e.touches[0].clientY; }}
+            onTouchEnd={(e) => {
+              if (swipeTouchStartX.current === null) return;
+              const dx = e.changedTouches[0].clientX - swipeTouchStartX.current;
+              const dy = e.changedTouches[0].clientY - swipeTouchStartY.current;
+              if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 60) {
+                if (dx < 0) { playNext(); showToast('Next song ⏭', 'info'); }
+                else { playPrev(); showToast('Previous song ⏮', 'info'); }
+              }
+              swipeTouchStartX.current = null;
+              swipeTouchStartY.current = null;
+            }}
+          >
             {/* Gradient Background tied to Album Art */}
             <div
-              className="absolute inset-0 z-0 opacity-40 blur-[80px] scale-125 pointer-events-none"
-              style={{ backgroundImage: currentSong ? `url(${currentSong.thumbnail})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}
+              className="absolute inset-0 z-0 opacity-50 blur-[100px] scale-150 pointer-events-none transition-all duration-1000"
+              style={{ background: `radial-gradient(circle at center, ${dominantColor}cc 0%, #121212 100%)` }}
             ></div>
-            <div className="absolute inset-0 bg-[#121212]/60 z-0 pointer-events-none"></div>
+            <div className="absolute inset-0 bg-black/40 z-0 pointer-events-none"></div>
 
-            {/* Header */}
             <div className="flex items-center justify-between p-5 pt-10 z-10 relative">
-              <button onClick={() => setActiveTab('Home')} className="p-2 -ml-2 text-white/70 hover:text-white transition-colors">
+              <button onClick={() => setActiveTab('Home')} className="p-2 -ml-2 text-white/70 hover:text-white transition-all active:scale-75">
                 <ArrowLeft size={24} />
               </button>
               <div className="text-center flex flex-col text-white font-semibold flex-1">
@@ -1046,16 +1384,19 @@ export default function App() {
                     onError={(e) => { e.target.src = '/logo.jpg'; }}
                   />
 
-                  {/* Equalizer Overlay - Small and Subtle */}
-                  <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex items-end justify-center gap-1 px-10 pb-4 z-10 pointer-events-none">
-                    {[...Array(20)].map((_, i) => {
-                      const durationAnim = 0.4 + (i % 3) * 0.2;
-                      const delayAnim = (i % 4) * 0.1;
+                  {/* Equalizer Overlay - REAL-TIME REACTIVE */}
+                  <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end justify-center gap-[3px] px-8 pb-4 z-10 pointer-events-none">
+                    {Array.from({ length: 24 }).map((_, i) => {
+                      // Map audio frequency data to bars
+                      const dataLen = audioData.length || 1;
+                      const value = audioData[i % dataLen] || 0;
+                      const height = (value / 255) * 100;
                       return (
-                        <div key={i} className={`flex-1 max-w-[4px] rounded-full bg-[#8cd92b] transition-all duration-500 ${isPlaying ? 'opacity-100' : 'opacity-30'}`}
+                        <div key={i} className="flex-1 max-w-[4px] rounded-full transition-all duration-150"
                           style={{
-                            height: isPlaying ? '40%' : '15%',
-                            animation: isPlaying ? `eq ${durationAnim}s ease-in-out infinite ${delayAnim}s alternate` : 'none'
+                            height: `${Math.max(12, height)}%`,
+                            backgroundColor: dominantColor,
+                            boxShadow: `0 0 10px ${dominantColor}66`
                           }}>
                         </div>
                       )
@@ -1081,7 +1422,7 @@ export default function App() {
                     className="absolute top-0 inset-x-2 h-4 -mt-1.5 opacity-0 z-10 cursor-pointer"
                   />
                   <div className="w-full h-[6px] bg-white/10 rounded-full overflow-hidden relative mb-2">
-                    <div className={`h-full rounded-full absolute top-0 left-0 transition-all duration-300 pointer-events-none ${isPlaying ? 'progress-glow' : 'bg-white/60'}`} style={{ width: `${(progress / (duration || 1)) * 100}%` }}></div>
+                    <div className={`h-full rounded-full absolute top-0 left-0 transition-all duration-300 pointer-events-none ${isPlaying ? 'progress-glow' : 'bg-white/60'}`} style={{ width: `${(progress / (duration || 1)) * 100}%`, backgroundColor: isPlaying ? dominantColor : undefined, boxShadow: isPlaying ? `0 0 15px ${dominantColor}` : undefined }}></div>
                   </div>
                   <div className="flex justify-between text-[11px] text-[#a0a0a0] font-bold tracking-widest">
                     <span>{formatTime(progress)}</span>
@@ -1091,29 +1432,61 @@ export default function App() {
 
                 {/* Controls */}
                 <div className="flex items-center justify-between w-full max-w-[340px] mt-4 mb-8">
-                  <button className="text-[#1ed760] hover:text-white transition-colors p-2"><Shuffle size={20} /></button>
-                  <button onClick={playPrev} className="text-white hover:text-white transition-colors p-2"><SkipBack size={32} fill="currentColor" /></button>
+                  <button className="text-[#1ed760] hover:text-white transition-all active:scale-75 p-2"><Shuffle size={20} /></button>
+                  <button onClick={playPrev} className="text-white hover:text-white transition-all active:scale-75 p-2"><SkipBack size={32} fill="currentColor" /></button>
 
                   <button
                     onClick={togglePlay}
-                    className="w-[68px] h-[68px] flex items-center justify-center bg-white rounded-full text-black hover:scale-105 transition-all shadow-md"
+                    className="w-[68px] h-[68px] flex items-center justify-center bg-white rounded-full text-black hover:scale-105 active:scale-90 transition-all shadow-md"
                   >
                     {isPlaying ? <Pause size={30} fill="currentColor" /> : <Play size={30} fill="currentColor" className="ml-1" />}
                   </button>
 
-                  <button onClick={playNext} className="text-white hover:text-white transition-colors p-2"><SkipForward size={32} fill="currentColor" /></button>
-                  <button className="text-[#a0a0a0] hover:text-white transition-colors p-2"><Repeat size={20} /></button>
+                  <button onClick={playNext} className="text-white hover:text-white transition-all active:scale-75 p-2"><SkipForward size={32} fill="currentColor" /></button>
+                  <button className="text-[#a0a0a0] hover:text-white transition-all active:scale-75 p-2"><Repeat size={20} /></button>
                 </div>
 
                 {/* Bottom Tool Bar */}
-                <div className="flex items-center justify-between w-full max-w-[340px] px-2 mb-8">
-                  <button onClick={() => setShowSleepModal(true)} className={`transition-colors ${sleepMinutesLeft > 0 ? 'text-[#1ed760]' : 'text-[#a0a0a0] hover:text-white'}`}>
-                    <Clock size={20} />
+                <div className="flex items-center justify-between w-full max-w-[340px] px-2 mb-8 relative">
+                  <button onClick={() => setShowSleepModal(true)} className={`transition-all active:scale-75 flex flex-col items-center gap-1 ${sleepMinutesLeft > 0 ? 'text-[#1ed760]' : 'text-[#a0a0a0] hover:text-white'}`}>
+                    <Clock size={20} className={sleepMinutesLeft > 0 ? 'animate-pulse' : ''} />
+                    {sleepMinutesLeft > 0 && <span className="text-[8px] font-bold">{sleepMinutesLeft}m</span>}
                   </button>
-                  <div className="flex gap-4">
-                    <button className="text-[#a0a0a0] hover:text-white transition-colors"><Upload size={20} /></button>
-                    <button className="text-[#a0a0a0] hover:text-white transition-colors"><List size={20} /></button>
+
+                  <button onClick={() => setIsLyricsVisible(true)} className="text-[#a0a0a0] hover:text-white transition-all active:scale-75 flex flex-col items-center gap-1">
+                    <Mic2 size={20} />
+                    <span className="text-[8px] font-bold uppercase tracking-tighter">Lyrics</span>
+                  </button>
+
+                  {/* Speed Picker */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowSpeedMenu(s => !s)}
+                      className={`flex flex-col items-center gap-1 transition-all active:scale-75 ${playbackSpeed !== 1 ? 'text-[#8cd92b]' : 'text-[#a0a0a0] hover:text-white'}`}
+                    >
+                      <Gauge size={20} />
+                      <span className="text-[8px] font-bold">{playbackSpeed}x</span>
+                    </button>
+                    {showSpeedMenu && (
+                      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 bg-[#1a1c2a] border border-[#262837] rounded-2xl shadow-2xl p-2 z-50 flex flex-col gap-1 min-w-[80px]">
+                        {[0.5, 0.75, 1, 1.25, 1.5, 2].map(s => (
+                          <button key={s} onClick={() => { setPlaybackSpeed(s); setShowSpeedMenu(false); if (backgroundAudio) backgroundAudio.playbackRate = s; showToast(`Speed: ${s}x 🎚️`, 'info'); }}
+                            className={`text-sm font-bold px-3 py-1.5 rounded-xl transition-all ${playbackSpeed === s ? 'bg-[#8cd92b] text-black' : 'text-white hover:bg-[#262837]'}`}
+                          >{s}x</button>
+                        ))}
+                      </div>
+                    )}
                   </div>
+
+                  <button onClick={() => shareSong(currentSong)} className="text-[#a0a0a0] hover:text-white transition-all active:scale-75 flex flex-col items-center gap-1">
+                    <Share2 size={20} />
+                    <span className="text-[8px] font-bold uppercase tracking-tighter">Share</span>
+                  </button>
+
+                  <button className="text-[#a0a0a0] hover:text-white transition-all active:scale-75 flex flex-col items-center gap-1">
+                    <List size={20} />
+                    <span className="text-[8px] font-bold uppercase tracking-tighter">Queue</span>
+                  </button>
                 </div>
 
                 {/* Mobile Up Next Mini preview */}
@@ -1138,6 +1511,12 @@ export default function App() {
                             <h4 className="font-semibold text-white text-[14px] truncate">{song.title}</h4>
                             <p className="text-[12px] text-[#a0a0a0] truncate mt-0.5">{song.artist || 'Unknown Artist'}</p>
                           </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setQueue(prev => prev.filter(q => q.id !== song.id)); }}
+                            className="p-2 text-gray-500 hover:text-red-400 transition-colors"
+                          >
+                            <X size={14} />
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -1152,6 +1531,43 @@ export default function App() {
                 <h3 className="text-lg font-bold text-white">No Track Selected</h3>
               </div>
             )}
+          </div>
+        )}
+
+        {/* LYRICS OVERLAY */}
+        {isLyricsVisible && currentSong && (
+          <div className="absolute inset-0 z-[60] bg-[#121212] animate-slide-up-premium flex flex-col">
+            <div
+              className="absolute inset-0 z-0 opacity-40 blur-[120px] scale-150"
+              style={{ background: `radial-gradient(circle at 30% 30%, ${dominantColor}ff 0%, #121212 100%)` }}
+            ></div>
+
+            <div className="flex items-center justify-between p-6 z-10">
+              <button onClick={() => setIsLyricsVisible(false)} className="p-2 bg-white/10 rounded-full text-white backdrop-blur-md">
+                <ChevronDown size={24} />
+              </button>
+              <div className="text-center">
+                <p className="text-[10px] uppercase tracking-widest text-[#a0a0a0] font-bold">Lyrics</p>
+                <p className="text-xs text-white font-bold truncate max-w-[200px]">{currentSong.title}</p>
+              </div>
+              <div className="w-10"></div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-8 py-10 z-10 no-scrollbar text-left flex flex-col gap-8">
+              <h2 className="text-3xl md:text-4xl font-black text-white/90 leading-tight">
+                Music is what feelings sound like.
+              </h2>
+              <div className="space-y-6 opacity-60">
+                <p className="text-2xl font-bold">{currentSong.title}</p>
+                <p className="text-xl font-semibold">By {currentSong.artist}</p>
+                <p className="text-lg italic">Instrumental or lyrics currently being fetched...</p>
+              </div>
+
+              <div className="mt-auto pt-10 border-t border-white/5 space-y-2 opacity-40">
+                <p className="text-sm">Enjoy the rhythm,</p>
+                <p className="text-sm">Feel the soul of ISAI.</p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1213,10 +1629,13 @@ export default function App() {
             onClick={() => setActiveTab('Music')}
             className="absolute bottom-24 left-4 right-4 bg-[#1a1c2a]/70 backdrop-blur-xl rounded-2xl p-2.5 flex items-center gap-3 border border-white/10 shadow-[0_15px_35px_rgba(0,0,0,0.5)] z-40 cursor-pointer animate-slide-up"
           >
-            <div className="relative shrink-0">
+            <div className="relative shrink-0 transition-transform active:scale-95">
               <img src={currentSong.thumbnail} alt="" className={`w-11 h-11 rounded-lg object-cover ${isPlaying ? 'animate-slow-pulse' : ''} border border-white/10`} />
               {isPlaying && (
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#8cd92b] rounded-full flex items-center justify-center border-2 border-[#121422]">
+                <div
+                  className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center border-2 border-[#121422] shadow-[0_0_8px_rgba(0,0,0,0.5)]"
+                  style={{ backgroundColor: dominantColor }}
+                >
                   <div className="w-1.5 h-1.5 bg-[#121422] rounded-full animate-ping"></div>
                 </div>
               )}
@@ -1227,26 +1646,27 @@ export default function App() {
               <p className="text-[10px] text-white/50 truncate mt-0.5">{currentSong.artist}</p>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0 px-1">
+            <div className="flex items-center gap-1 shrink-0 px-1">
               <button
                 onClick={(e) => { e.stopPropagation(); playPrev(); }}
-                className="p-2 text-white/70 hover:text-white transition-colors"
+                className="p-1.5 text-white/70 hover:text-white transition-all active:scale-75"
               >
-                <SkipBack size={18} fill="currentColor" />
+                <SkipBack size={16} fill="currentColor" />
               </button>
 
               <button
                 onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                className="w-10 h-10 flex items-center justify-center bg-white rounded-full text-black shadow-lg shadow-white/10 hover:scale-105 active:scale-95 transition-all"
+                className="w-10 h-10 flex items-center justify-center bg-white rounded-full text-black shadow-lg hover:scale-105 active:scale-90 transition-all"
+                style={{ boxShadow: isPlaying ? `0 0 15px ${dominantColor}66` : undefined }}
               >
                 {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
               </button>
 
               <button
                 onClick={(e) => { e.stopPropagation(); playNext(); }}
-                className="p-2 text-white/70 hover:text-white transition-colors"
+                className="p-1.5 text-white/70 hover:text-white transition-all active:scale-75"
               >
-                <SkipForward size={18} fill="currentColor" />
+                <SkipForward size={16} fill="currentColor" />
               </button>
             </div>
           </div>
@@ -1254,24 +1674,24 @@ export default function App() {
 
         {/* Bottom Navigation */}
         <div className="absolute bottom-0 w-full h-20 bg-[#121422]/95 backdrop-blur-xl border-t border-[#262837]/50 flex items-center justify-around px-2 pb-2 rounded-none z-10 shadow-[0_-10px_30px_rgba(0,0,0,0.3)]">
-          <button onClick={() => setActiveTab('Home')} className={`flex flex-col items-center justify-center gap-1.5 transition-colors w-16 h-12 rounded-xl ${activeTab === 'Home' ? 'text-[#8cd92b]' : 'text-gray-500'}`}>
+          <button onClick={() => setActiveTab('Home')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-16 h-12 rounded-xl active:scale-90 active:opacity-70 ${activeTab === 'Home' ? 'text-[#8cd92b]' : 'text-gray-500'}`}>
             <Home size={20} />
-            {activeTab === 'Home' && <span className="w-1 h-1 rounded-full bg-[#8cd92b]"></span>}
+            {activeTab === 'Home' && <span className="w-1 h-1 rounded-full bg-[#8cd92b] animate-pulse"></span>}
           </button>
 
-          <button onClick={() => setActiveTab('Search')} className={`flex flex-col items-center justify-center gap-1.5 transition-colors w-16 h-12 rounded-xl ${activeTab === 'Search' ? 'text-[#8cd92b]' : 'text-gray-500'}`}>
+          <button onClick={() => setActiveTab('Search')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-16 h-12 rounded-xl active:scale-90 active:opacity-70 ${activeTab === 'Search' ? 'text-[#8cd92b]' : 'text-gray-500'}`}>
             <Search size={20} />
-            {activeTab === 'Search' && <span className="w-1 h-1 rounded-full bg-[#8cd92b]"></span>}
+            {activeTab === 'Search' && <span className="w-1 h-1 rounded-full bg-[#8cd92b] animate-pulse"></span>}
           </button>
 
-          <button onClick={() => setActiveTab('Favorites')} className={`flex flex-col items-center justify-center gap-1.5 transition-colors w-16 h-12 rounded-xl ${activeTab === 'Favorites' ? 'text-[#8cd92b]' : 'text-gray-500'}`}>
+          <button onClick={() => setActiveTab('Favorites')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-16 h-12 rounded-xl active:scale-90 active:opacity-70 ${activeTab === 'Favorites' ? 'text-[#8cd92b]' : 'text-gray-500'}`}>
             <Heart size={20} fill={activeTab === 'Favorites' ? 'currentColor' : 'none'} />
-            {activeTab === 'Favorites' && <span className="w-1 h-1 rounded-full bg-[#8cd92b]"></span>}
+            {activeTab === 'Favorites' && <span className="w-1 h-1 rounded-full bg-[#8cd92b] animate-pulse"></span>}
           </button>
 
-          <button onClick={() => setActiveTab('Music')} className={`flex flex-col items-center justify-center gap-1.5 transition-colors w-16 h-12 rounded-xl ${activeTab === 'Music' ? 'text-[#8cd92b]' : 'text-gray-500'}`}>
+          <button onClick={() => setActiveTab('Music')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-16 h-12 rounded-xl active:scale-90 active:opacity-70 ${activeTab === 'Music' ? 'text-[#8cd92b]' : 'text-gray-500'}`}>
             <Headphones size={20} />
-            {activeTab === 'Music' && <span className="w-1 h-1 rounded-full bg-[#8cd92b]"></span>}
+            {activeTab === 'Music' && <span className="w-1 h-1 rounded-full bg-[#8cd92b] animate-pulse"></span>}
           </button>
         </div>
 
@@ -1280,17 +1700,16 @@ export default function App() {
       {/* App Container - Desktop Layout */}
       <div className="hidden md:flex w-full max-w-[1200px] h-[850px] max-h-[90vh] bg-[#121422] rounded-[36px] shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden text-[#a0a3b1]">
         {/* Left Sidebar */}
-        <div className="w-64 bg-[#1a1c2a] flex flex-col pt-10 pb-8 px-8 border-r border-[#262837] shrink-0 z-10">
+        <div className="w-64 bg-[#1a1c2a] flex flex-col pt-10 pb-8 px-8 border-r border-[#262837] shrink-0 z-10 transition-colors">
           <h1 className="text-2xl font-bold mb-10 text-white flex items-center gap-4 px-1">
-            <img src="/logo.png" alt="Isai" className="h-12 w-12 object-cover rounded-2xl shadow-xl shadow-[#8cd92b]/20" />
+            <img src="/logo.png" alt="Isai" className="h-12 w-12 object-cover rounded-2xl shadow-xl transition-all" style={{ boxShadow: `0 10px 30px ${dominantColor}33` }} />
             <div className="flex flex-col">
               <span className="text-white tracking-tighter text-3xl font-black italic -mb-1">ISAI</span>
-              {/* <span className="text-[#8cd92b] text-sm font-bold tracking-widest lowercase opacity-80 pl-1">இசை player</span> */}
             </div>
           </h1>
           <nav className="flex-1 space-y-5 overflow-y-auto no-scrollbar">
-            <div className="flex items-center gap-4 text-white font-semibold cursor-pointer border-l-2 border-[#8cd92b] pl-2 -ml-2.5">
-              <Music size={18} className="text-[#8cd92b]" /> <span className="text-sm">Playlist</span>
+            <div className="flex items-center gap-4 font-semibold cursor-pointer border-l-2 pl-2 -ml-2.5 transition-all" style={{ color: dominantColor, borderColor: dominantColor }}>
+              <Music size={18} /> <span className="text-sm">Playlist</span>
             </div>
             <div className="flex items-center gap-4 hover:text-white font-medium cursor-pointer transition-colors pl-2">
               <Heart size={18} /> <span className="text-sm">Favorites</span>
