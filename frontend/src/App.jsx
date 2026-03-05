@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 // Build ID: 2026-03-03-2225 (Vercel Fix)
 import ReactPlayer from 'react-player';
-import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Home, Music, Search, User, Play, Pause, SkipBack, SkipForward, Heart, MoreHorizontal, ArrowLeft, Shuffle, Repeat, Upload, List, Headphones, Book, Download, Clock, Settings, LogOut, Bell, ChevronRight, ChevronUp, Plus, X, FolderPlus, Mic2 } from 'lucide-react';
 import { formatTime } from './utils';
 
@@ -54,8 +53,6 @@ if (backgroundAudio) {
   backgroundAudio.setAttribute('playsinline', 'true');
 }
 
-const MusicPlayer = registerPlugin('MusicPlayer');
-
 const DesktopSongRow = React.memo(function DesktopSongRow({
   song,
   index,
@@ -84,7 +81,6 @@ const DesktopSongRow = React.memo(function DesktopSongRow({
 });
 
 export default function App() {
-  const [isNativeAndroid] = useState(Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android');
   const [activeTab, setActiveTab] = useState('Home');
   const [currentSong, setCurrentSong] = useState(null);
   const [useIframeFallback, setUseIframeFallback] = useState(false);
@@ -92,29 +88,6 @@ export default function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
-
-  // Listen for native playback updates
-  useEffect(() => {
-    if (!isNativeAndroid || !MusicPlayer) return;
-
-    let listener;
-    const addListener = async () => {
-      listener = await MusicPlayer.addListener('playbackStatus', (data) => {
-        if (data.position != null) setProgress(data.position);
-        if (data.duration != null && data.duration > 0) setDuration(data.duration);
-        // Sync isPlaying back to JS if changed natively (e.g. from notification)
-        if (data.isPlaying != null && data.isPlaying !== isPlaying) {
-          setIsPlaying(data.isPlaying);
-        }
-      });
-    };
-
-    addListener();
-
-    return () => {
-      if (listener) listener.remove();
-    };
-  }, [isNativeAndroid, isPlaying]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -655,19 +628,7 @@ export default function App() {
   };
 
   const [directStreamUrl, setDirectStreamUrl] = useState(null);
-  const [nativePlaybackFailed, setNativePlaybackFailed] = useState(false);
   const currentStreamUrl = directStreamUrl || (currentSong ? `${streamEndpointBase}?videoId=${currentSong.id}` : '');
-
-  const callNativePlayer = useCallback(async (method, payload = {}) => {
-    if (!isNativeAndroid || !MusicPlayer?.[method]) return;
-    try {
-      await MusicPlayer[method](payload);
-      return true;
-    } catch (e) {
-      console.warn(`Native player ${method} failed:`, e);
-      return false;
-    }
-  }, [isNativeAndroid]);
 
   // Mobile Background Playback & MediaSession API Logic
   const silentAudioRef = useRef(null);
@@ -678,7 +639,6 @@ export default function App() {
   playPrevRef.current = playPrev;
 
   const setupMediaSession = useCallback(() => {
-    if (isNativeAndroid) return;
     if ('mediaSession' in navigator && currentSong) {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: currentSong.title,
@@ -716,7 +676,7 @@ export default function App() {
         console.warn("MediaSession handlers failed:", e);
       }
     }
-  }, [isNativeAndroid, currentSong, setIsPlaying]);
+  }, [currentSong, setIsPlaying]);
 
   useEffect(() => {
     setUseIframeFallback(false);
@@ -724,7 +684,6 @@ export default function App() {
   }, [currentSong, setupMediaSession]);
 
   useEffect(() => {
-    if (isNativeAndroid) return;
     if (silentAudioRef.current) {
       if (isPlaying) {
         silentAudioRef.current.play().catch(() => { });
@@ -735,11 +694,10 @@ export default function App() {
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
     }
-  }, [isNativeAndroid, isPlaying]);
+  }, [isPlaying]);
 
   // Audio Context Unlock for Mobile
   useEffect(() => {
-    if (isNativeAndroid) return;
     const unlock = () => {
       if (silentAudioRef.current) {
         silentAudioRef.current.play().then(() => {
@@ -755,7 +713,7 @@ export default function App() {
       window.removeEventListener('click', unlock);
       window.removeEventListener('touchstart', unlock);
     };
-  }, [isNativeAndroid]);
+  }, []);
 
   useEffect(() => {
     if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState || !currentSong || !duration) return;
@@ -773,7 +731,6 @@ export default function App() {
   const shouldShowQueue = Boolean(currentSong) && !hasActiveSearchResults;
 
   useEffect(() => {
-    if (isNativeAndroid && !nativePlaybackFailed) return;
     if (backgroundAudio) {
       backgroundAudio.onended = () => playNext();
       backgroundAudio.ontimeupdate = () => setProgress(backgroundAudio.currentTime);
@@ -783,45 +740,25 @@ export default function App() {
         if (!useIframeFallback) setUseIframeFallback(true);
       };
     }
-  }, [isNativeAndroid, nativePlaybackFailed]);
+  }, []);
 
   useEffect(() => {
-    if (isNativeAndroid && !nativePlaybackFailed) return;
     if (!backgroundAudio) return;
     if (isPlaying && !useIframeFallback) {
       backgroundAudio.play().catch(e => console.error("Play failed", e));
     } else {
       backgroundAudio.pause();
     }
-  }, [isNativeAndroid, nativePlaybackFailed, isPlaying, useIframeFallback]);
+  }, [isPlaying, useIframeFallback]);
 
   useEffect(() => {
-    if (isNativeAndroid && !nativePlaybackFailed) return;
     if (backgroundAudio && currentStreamUrl && !useIframeFallback) {
       backgroundAudio.src = currentStreamUrl;
       if (isPlaying) backgroundAudio.play().catch(e => console.error("URL change play failed", e));
     }
-  }, [isNativeAndroid, nativePlaybackFailed, currentStreamUrl, useIframeFallback, isPlaying]);
+  }, [currentStreamUrl, useIframeFallback, isPlaying]);
 
-  useEffect(() => {
-    if (!isNativeAndroid || !currentSong) return;
-    const runNative = async () => {
-      const fallbackStreamUrl = `${streamEndpointBase}?videoId=${currentSong.id}`;
-      if (isPlaying && currentStreamUrl) {
-        const ok = await callNativePlayer('play', {
-          url: currentStreamUrl,
-          fallbackUrl: fallbackStreamUrl,
-          title: currentSong.title,
-          artist: currentSong.artist,
-          thumbnail: currentSong.thumbnail
-        });
-        setNativePlaybackFailed(ok === false);
-      } else if (!isPlaying) {
-        await callNativePlayer('pause');
-      }
-    };
-    runNative();
-  }, [isPlaying, currentSong, currentStreamUrl, callNativePlayer]);
+  // No native player needed for web PWA
 
   return (
     <div className="flex items-center justify-center bg-gray-900 overflow-hidden font-['Outfit']" style={{ height: '100dvh' }}>
