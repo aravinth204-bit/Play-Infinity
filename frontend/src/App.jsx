@@ -150,11 +150,41 @@ export default function App() {
   const [discoverIndex, setDiscoverIndex] = useState(0);
 
   useEffect(() => {
-    // Populate simple discover queue from trending + shuffle
-    if (trendingSongs.length > 0 && discoverQueue.length === 0) {
-      setDiscoverQueue([...trendingSongs, ...songs].sort(() => 0.5 - Math.random()));
+    // Keep populating the discover queue so it never empties out
+    if (discoverQueue.length - discoverIndex < 5) {
+      const candidates = [...trendingSongs, ...songs, ...fallbackSongs]
+        .filter(s => !discoverQueue.some(dq => dq.id === s.id))
+        .sort(() => 0.5 - Math.random())
+        .slice(0, 15);
+      if (candidates.length > 0) {
+        setDiscoverQueue(prev => [...prev, ...candidates]);
+      }
     }
-  }, [trendingSongs, songs, discoverQueue]);
+  }, [trendingSongs, songs, fallbackSongs, discoverQueue, discoverIndex]);
+
+  // FEATURE: Real Listening Time
+  const [totalListeningSeconds, setTotalListeningSeconds] = useState(() => {
+    try {
+      const stored = localStorage.getItem('totalListeningSeconds');
+      if (stored) return parseInt(stored, 10);
+      const existingHistory = JSON.parse(localStorage.getItem('listenHistory') || '[]');
+      return existingHistory.length * 240; // Approx baseline
+    } catch { return 0; }
+  });
+
+  useEffect(() => {
+    let interval;
+    if (isPlaying && currentSong) {
+      interval = setInterval(() => {
+        setTotalListeningSeconds(prev => {
+          const next = prev + 1;
+          if (next % 10 === 0) localStorage.setItem('totalListeningSeconds', next.toString());
+          return next;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, currentSong]);
 
   const handleDownloadShareCard = async () => {
     if (!shareCardRef.current) return;
@@ -2122,7 +2152,9 @@ export default function App() {
                   </div>
                   <div className="bg-[#1a1c2a] p-5 rounded-3xl border border-white/5">
                     <Clock size={24} className="text-[#22c7b5] mb-3" />
-                    <p className="text-white text-3xl font-black">{Math.floor((listenHistory.length * 4) / 60)}h {(listenHistory.length * 4) % 60}m</p>
+                    <p className="text-white text-3xl font-black">
+                      {Math.floor(totalListeningSeconds / 3600)}h {Math.floor((totalListeningSeconds % 3600) / 60)}m
+                    </p>
                     <p className="text-white/40 text-[11px] font-bold uppercase tracking-wider mt-1">Time Listened</p>
                   </div>
                 </div>
