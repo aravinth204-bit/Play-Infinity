@@ -222,11 +222,28 @@ export default function App() {
     try {
       const savedQueue = JSON.parse(localStorage.getItem('savedQueue') || '[]');
       const savedSong = JSON.parse(localStorage.getItem('savedCurrentSong') || 'null');
+      const savedProg = parseFloat(localStorage.getItem('savedProgress') || '0');
       if (savedQueue.length > 0) setQueue(savedQueue);
       // Don't auto-play saved song — just restore it silently
-      if (savedSong) setCurrentSong(savedSong);
+      if (savedSong) {
+        setCurrentSong(savedSong);
+        if (savedProg > 0) setProgress(savedProg);
+      }
     } catch { }
   }, []);
+
+  // Save current song, queue, and progress to localStorage for restore
+  useEffect(() => {
+    if (currentSong) localStorage.setItem('savedCurrentSong', JSON.stringify(currentSong));
+  }, [currentSong]);
+
+  useEffect(() => {
+    localStorage.setItem('savedQueue', JSON.stringify(queue));
+  }, [queue]);
+
+  useEffect(() => {
+    if (progress > 0) localStorage.setItem('savedProgress', progress.toString());
+  }, [progress]);
 
   // ──────────────────────────────────────────────────────
   // FEATURE: Tamil-only filter — block non-Tamil songs
@@ -1093,6 +1110,7 @@ export default function App() {
       console.warn("Audio visualization setup failed:", err);
     }
 
+    setProgress(0);
     setCurrentSong(song);
     setIsPlaying(true);
     setActiveTab('Music');
@@ -1394,6 +1412,13 @@ export default function App() {
   useEffect(() => {
     if (backgroundAudio && currentStreamUrl && !useIframeFallback) {
       backgroundAudio.src = currentStreamUrl;
+      const savedProg = parseFloat(localStorage.getItem('savedProgress') || '0');
+
+      // If we are restoring from previous session without auto-playing
+      if (!isPlaying && savedProg > 0) {
+        backgroundAudio.currentTime = savedProg;
+      }
+
       if (isPlaying) backgroundAudio.play().catch(e => console.error("URL change play failed", e));
     }
   }, [currentStreamUrl, useIframeFallback, isPlaying]);
