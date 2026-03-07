@@ -149,6 +149,13 @@ export default function App() {
   const [discoverQueue, setDiscoverQueue] = useState([]);
   const [discoverIndex, setDiscoverIndex] = useState(0);
 
+  const favoriteIds = useMemo(() => new Set(favorites.map(s => s.id)), [favorites]);
+  const fallbackSongs = useMemo(() => {
+    if (songs.length > 0) return songs;
+    const historyIds = new Set(searchHistory.map(h => h.id));
+    return [...searchHistory, ...trendingSongs.filter(t => !historyIds.has(t.id))].slice(0, 30);
+  }, [songs, searchHistory, trendingSongs]);
+
   useEffect(() => {
     // Keep populating the discover queue so it never empties out
     if (discoverQueue.length - discoverIndex < 5) {
@@ -655,13 +662,6 @@ export default function App() {
     // YouTube thumbnails: replace hqdefault or mqdefault with maxresdefault for 4K/HD
     return url.replace(/(hqdefault|mqdefault|sddefault)\.jpg/i, 'maxresdefault.jpg');
   };
-
-  const favoriteIds = useMemo(() => new Set(favorites.map(s => s.id)), [favorites]);
-  const fallbackSongs = useMemo(() => {
-    if (songs.length > 0) return songs;
-    const historyIds = new Set(searchHistory.map(h => h.id));
-    return [...searchHistory, ...trendingSongs.filter(t => !historyIds.has(t.id))].slice(0, 30);
-  }, [songs, searchHistory, trendingSongs]);
 
 
 
