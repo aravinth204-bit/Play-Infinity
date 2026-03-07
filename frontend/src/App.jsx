@@ -1412,7 +1412,10 @@ export default function App() {
 
         {/* Mobile Main Content Area */}
         {activeTab !== 'Music' && (
-          <div className="flex-1 overflow-y-auto no-scrollbar pb-20 overscroll-contain scroll-smooth">
+          <div
+            className="flex-1 overflow-y-auto no-scrollbar overscroll-contain scroll-smooth"
+            style={{ paddingBottom: currentSong ? 'calc(9.5rem + env(safe-area-inset-bottom))' : 'calc(5.5rem + env(safe-area-inset-bottom))' }}
+          >
             {/* HOME VIEW */}
             {activeTab === 'Home' && (() => {
               const hour = new Date().getHours();
@@ -1682,7 +1685,7 @@ export default function App() {
                               <h4 className="text-white text-[13px] font-semibold truncate">{song.title}</h4>
                               <p className="text-white/40 text-[11px] truncate mt-0.5">{song.artist}</p>
                             </div>
-                            <button onClick={(e) => { e.stopPropagation(); toggleFavorite(e, song); }} className="p-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity active:opacity-100">
+                            <button onClick={(e) => { e.stopPropagation(); toggleFavorite(e, song); }} className="p-2 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity active:opacity-100">
                               <Heart size={16} fill={favoriteIds.has(song.id) ? dominantColor : 'none'} stroke={favoriteIds.has(song.id) ? dominantColor : 'currentColor'} className="text-white/40" />
                             </button>
                           </div>
@@ -1698,7 +1701,7 @@ export default function App() {
             {activeTab === 'Favorites' && (
               <div className="overflow-x-hidden min-h-screen bg-[#121212] animate-fade-in animate-slide-up-premium">
                 <div className="px-5 pt-12 pb-6 flex flex-col justify-end" style={{ background: `linear-gradient(to bottom, ${dominantColor}dd 0%, #121212 100%)` }}>
-                  <div onClick={() => setActiveTab('Home')} className="mb-6 bg-black/20 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer hover:bg-black/40">
+                  <div onClick={() => setActiveTab('Home')} className="mb-6 bg-black/20 w-11 h-11 rounded-full flex items-center justify-center cursor-pointer hover:bg-black/40 active:scale-95 transition-all">
                     <ArrowLeft size={20} className="text-white" />
                   </div>
                   <h1 className="text-3xl font-bold text-white tracking-widest leading-tight">Liked Songs</h1>
@@ -1735,7 +1738,7 @@ export default function App() {
             {activeTab === 'History' && (
               <div className="overflow-x-hidden min-h-screen bg-[#121212] animate-fade-in animate-slide-up-premium">
                 <div className="px-5 pt-12 pb-6" style={{ background: `linear-gradient(to bottom, ${dominantColor}55 0%, #121212 100%)` }}>
-                  <button onClick={() => setActiveTab('Home')} className="mb-4 w-9 h-9 bg-black/20 rounded-full flex items-center justify-center hover:bg-black/30 transition-all">
+                  <button onClick={() => setActiveTab('Home')} className="mb-4 w-11 h-11 bg-black/20 rounded-full flex items-center justify-center hover:bg-black/30 active:scale-95 transition-all">
                     <ArrowLeft size={18} className="text-white" />
                   </button>
                   <h1 className="text-3xl font-bold text-white">Recently Played</h1>
@@ -1786,7 +1789,7 @@ export default function App() {
                 {/* Hero Header */}
                 <div className={`relative px-5 pt-12 pb-8 overflow-hidden`} style={{ background: `linear-gradient(160deg, ${dominantColor}55 0%, #121212 100%)` }}>
                   <div className={`absolute inset-0 bg-gradient-to-br ${selectedDirector.color} opacity-20`} />
-                  <button onClick={() => setActiveTab('Home')} className="relative z-10 mb-5 w-9 h-9 bg-black/20 rounded-full flex items-center justify-center hover:bg-black/40 transition-all">
+                  <button onClick={() => setActiveTab('Home')} className="relative z-10 mb-5 w-11 h-11 bg-black/20 rounded-full flex items-center justify-center hover:bg-black/40 active:scale-95 transition-all">
                     <ArrowLeft size={18} className="text-white" />
                   </button>
                   <div className="relative z-10 flex items-center gap-4">
@@ -1838,7 +1841,7 @@ export default function App() {
                           <h4 className="text-white text-[13px] font-semibold truncate">{song.title}</h4>
                           <p className="text-white/40 text-[11px] truncate mt-0.5">{song.artist}</p>
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); toggleFavorite(e, song); }} className="p-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity active:opacity-100">
+                        <button onClick={(e) => { e.stopPropagation(); toggleFavorite(e, song); }} className="p-2 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity active:opacity-100">
                           <Heart size={16} fill={favoriteIds.has(song.id) ? dominantColor : 'none'} stroke={favoriteIds.has(song.id) ? dominantColor : '#6b7280'} />
                         </button>
                       </div>
@@ -1859,7 +1862,7 @@ export default function App() {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Songs, artists, moods..."
-                      className="w-full bg-white text-black px-4 py-[12px] pl-10 pr-12 rounded-xl outline-none font-semibold text-[14px] shadow-lg"
+                      className="w-full bg-white text-black px-4 py-[12px] pl-10 pr-12 rounded-xl outline-none font-semibold text-base shadow-lg"
                     />
                     <Search className="absolute left-3 top-3.5 text-[#121212]" size={18} />
                     {searchQuery && (
@@ -2101,8 +2104,8 @@ export default function App() {
                 </div>
 
                 {/* Song Info */}
-                <div className="w-full max-w-[340px] mt-12 mb-6 flex justify-between items-center gap-2">
-                  <div className="w-full mb-4">
+                <div className="w-full max-w-[340px] mt-12 mb-6 flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
                     <h2 className="text-[22px] font-bold text-white truncate leading-tight">{cleanTitle(currentSong.title)}</h2>
                     <p className="text-[16px] text-[#a0a0a0] font-medium mt-1 truncate">{currentSong.artist?.replace(/ - Topic| VEVO/gi, '') || 'Unknown Artist'}</p>
                   </div>
@@ -2346,7 +2349,8 @@ export default function App() {
         {currentSong && activeTab !== 'Music' && (
           <div
             onClick={() => setActiveTab('Music')}
-            className="absolute bottom-[88px] left-3 right-3 bg-black/50 backdrop-blur-2xl rounded-[20px] p-2 flex items-center gap-3 border border-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.6)] z-40 cursor-pointer animate-slide-up overflow-hidden group"
+            className="absolute left-3 right-3 bg-black/50 backdrop-blur-2xl rounded-[20px] p-2 flex items-center gap-3 border border-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.6)] z-40 cursor-pointer animate-slide-up overflow-hidden group"
+            style={{ bottom: 'calc(5.5rem + env(safe-area-inset-bottom))' }}
           >
             {/* Mini Progress Bar Line at bottom */}
             <div className="absolute bottom-0 left-0 h-[2px] bg-white/20 w-full">
@@ -2377,7 +2381,7 @@ export default function App() {
         )}
 
         {/* Bottom Navigation */}
-        <div className="absolute bottom-0 w-full h-20 bg-[#121422]/95 backdrop-blur-xl border-t border-[#262837]/50 flex items-center justify-around px-2 pb-2 rounded-none z-10 shadow-[0_-10px_30px_rgba(0,0,0,0.3)]">
+        <div className="absolute bottom-0 w-full h-[calc(5rem+env(safe-area-inset-bottom))] bg-[#121422]/95 backdrop-blur-xl border-t border-[#262837]/50 flex items-center justify-around px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] rounded-none z-10 shadow-[0_-10px_30px_rgba(0,0,0,0.3)]">
           <button onClick={() => setActiveTab('Home')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-16 h-12 rounded-xl active:scale-90 active:opacity-70 ${activeTab === 'Home' ? 'text-[#8cd92b]' : 'text-gray-500'}`}>
             <Home size={20} />
             {activeTab === 'Home' && <span className="w-1 h-1 rounded-full bg-[#8cd92b] animate-pulse"></span>}
