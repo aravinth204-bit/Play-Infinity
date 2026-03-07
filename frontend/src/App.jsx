@@ -146,28 +146,12 @@ export default function App() {
   const [visualizerMode, setVisualizerMode] = useState(0); // 0=Equalizer, 1=Halo Only, 2=Off
   const [showShareCard, setShowShareCard] = useState(false);
   const shareCardRef = useRef(null);
-  const [discoverQueue, setDiscoverQueue] = useState([]);
-  const [discoverIndex, setDiscoverIndex] = useState(0);
-
   const favoriteIds = useMemo(() => new Set(favorites.map(s => s.id)), [favorites]);
   const fallbackSongs = useMemo(() => {
     if (songs.length > 0) return songs;
     const historyIds = new Set(searchHistory.map(h => h.id));
     return [...searchHistory, ...trendingSongs.filter(t => !historyIds.has(t.id))].slice(0, 30);
   }, [songs, searchHistory, trendingSongs]);
-
-  useEffect(() => {
-    // Keep populating the discover queue so it never empties out
-    if (discoverQueue.length - discoverIndex < 5) {
-      const candidates = [...trendingSongs, ...songs, ...fallbackSongs]
-        .filter(s => !discoverQueue.some(dq => dq.id === s.id))
-        .sort(() => 0.5 - Math.random())
-        .slice(0, 15);
-      if (candidates.length > 0) {
-        setDiscoverQueue(prev => [...prev, ...candidates]);
-      }
-    }
-  }, [trendingSongs, songs, fallbackSongs, discoverQueue, discoverIndex]);
 
   // FEATURE: Real Listening Time
   const [totalListeningSeconds, setTotalListeningSeconds] = useState(() => {
@@ -2071,66 +2055,7 @@ export default function App() {
               </div>
             )}
 
-            {/* DISCOVER (TINDER STYLE SWIPE) VIEW */}
-            {activeTab === 'Discover' && (
-              <div className="flex flex-col h-full bg-[#121212] overflow-hidden">
-                <div className="p-6 pt-12 shrink-0 text-center">
-                  <h1 className="text-2xl font-black text-white flex items-center gap-2 justify-center"><Flame className="text-[#ff4500]" /> Discover</h1>
-                  <p className="text-white/50 text-xs mt-1 font-bold">Swipe Right to Like, Left to Skip</p>
-                </div>
 
-                <div className="flex-1 relative flex items-center justify-center -mt-10 px-6 max-h-[600px]">
-                  {discoverQueue.length > 0 && discoverIndex < discoverQueue.length ? (
-                    <div className="relative w-full max-w-[340px] aspect-[3/4] rounded-[40px] shadow-[0_30px_60px_rgba(0,0,0,0.8)] overflow-hidden bg-[#1a1a1a] border border-white/10 animate-fade-in mx-auto">
-                      <img src={getHighResImage(discoverQueue[discoverIndex].thumbnail)} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
-
-                      {/* Floating Play Button */}
-                      <button
-                        onClick={() => playSong(discoverQueue[discoverIndex])}
-                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 bg-white/20 backdrop-blur-xl rounded-full text-white flex items-center justify-center active:scale-90 transition-all shadow-2xl"
-                      >
-                        <Play size={36} fill="white" className="ml-2" />
-                      </button>
-
-                      <div className="absolute bottom-0 inset-x-0 p-8">
-                        <h2 className="text-white text-2xl font-black leading-tight mb-2 drop-shadow-lg">{discoverQueue[discoverIndex].title}</h2>
-                        <p className="text-white/70 font-semibold mb-6 drop-shadow-lg">{discoverQueue[discoverIndex].artist}</p>
-
-                        <div className="flex items-center justify-between">
-                          <button
-                            onClick={() => {
-                              showToast('Skipped ⏭', 'info');
-                              setDiscoverIndex(prev => prev + 1);
-                            }}
-                            className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-lg flex items-center justify-center text-red-500 hover:bg-white/20 active:scale-90 transition-all"
-                          >
-                            <X size={28} strokeWidth={3} />
-                          </button>
-
-                          <button
-                            onClick={(e) => {
-                              toggleFavorite(e, discoverQueue[discoverIndex]);
-                              showToast('Liked! Added to Favorites ❤️', 'info');
-                              setDiscoverIndex(prev => prev + 1);
-                            }}
-                            className="w-16 h-16 rounded-full bg-[#8cd92b]/20 backdrop-blur-lg flex items-center justify-center text-[#8cd92b] hover:bg-[#8cd92b]/30 active:scale-90 transition-all shadow-[0_0_20px_rgba(140,217,43,0.3)]"
-                          >
-                            <Heart size={28} fill="currentColor" strokeWidth={0} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center text-white/50 font-bold">
-                      <p className="text-4xl mb-4">🎵</p>
-                      <p>You've swiped them all!</p>
-                      <button onClick={() => setDiscoverIndex(0)} className="mt-4 px-6 py-2 bg-white/10 rounded-full text-white text-sm">Restart Discovery</button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
 
             {/* PROFILE (LISTENING STATS) VIEW */}
             {activeTab === 'Profile' && (
@@ -2603,11 +2528,6 @@ export default function App() {
           <button onClick={() => setActiveTab('Home')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-16 h-12 rounded-xl active:scale-90 active:opacity-70 ${activeTab === 'Home' ? 'text-[#8cd92b]' : 'text-gray-500'}`}>
             <Home size={20} />
             {activeTab === 'Home' && <span className="w-1 h-1 rounded-full bg-[#8cd92b] animate-pulse"></span>}
-          </button>
-
-          <button onClick={() => setActiveTab('Discover')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-16 h-12 rounded-xl active:scale-90 active:opacity-70 ${activeTab === 'Discover' ? 'text-[#ff4500]' : 'text-gray-500'}`}>
-            <Flame size={20} />
-            {activeTab === 'Discover' && <span className="w-1 h-1 rounded-full bg-[#ff4500] animate-pulse"></span>}
           </button>
 
           <button onClick={() => setActiveTab('Search')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-16 h-12 rounded-xl active:scale-90 active:opacity-70 ${activeTab === 'Search' ? 'text-[#8cd92b]' : 'text-gray-500'}`}>
