@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 // Build ID: 2026-03-05-MEGAUPDATE
 import ReactPlayer from 'react-player';
-import { Home, Music, Search, User, Play, Pause, SkipBack, SkipForward, Heart, MoreHorizontal, ArrowLeft, Shuffle, Repeat, Upload, List, Headphones, Book, Download, Clock, Settings, LogOut, Bell, ChevronRight, ChevronUp, ChevronDown, Plus, X, FolderPlus, Mic2, Share2, Wifi, WifiOff, History, Gauge, CheckCircle2 } from 'lucide-react';
+import { Home, Music, Search, User, Play, Pause, SkipBack, SkipForward, Heart, MoreHorizontal, ArrowLeft, Shuffle, Repeat, Upload, List, Headphones, Book, Download, Clock, Settings, LogOut, Bell, ChevronRight, ChevronUp, ChevronDown, Plus, X, FolderPlus, Mic2, Share2, Wifi, WifiOff, History, Gauge, CheckCircle2, Camera, Instagram, Flame, Award, BarChart2 } from 'lucide-react';
 import { formatTime } from './utils';
+import { toPng } from 'html-to-image';
 
 const AnimatedHeart = ({ isFavorite, onClick, className = '', size = 16 }) => {
   const [particles, setParticles] = useState([]);
@@ -140,6 +141,33 @@ export default function App() {
   const [showSleepModal, setShowSleepModal] = useState(false);
   const [isLyricsVisible, setIsLyricsVisible] = useState(false);
   const sleepTimerRef = useRef(null);
+
+  // PREMIUM INTERACTIVE FEATURES (Insta Story, Swipe, Profile, Visualizer)
+  const [visualizerMode, setVisualizerMode] = useState(0); // 0=Equalizer, 1=Halo Only, 2=Off
+  const [showShareCard, setShowShareCard] = useState(false);
+  const shareCardRef = useRef(null);
+  const [discoverQueue, setDiscoverQueue] = useState([]);
+  const [discoverIndex, setDiscoverIndex] = useState(0);
+
+  useEffect(() => {
+    // Populate simple discover queue from trending + shuffle
+    if (trendingSongs.length > 0 && discoverQueue.length === 0) {
+      setDiscoverQueue([...trendingSongs, ...songs].sort(() => 0.5 - Math.random()));
+    }
+  }, [trendingSongs, songs, discoverQueue]);
+
+  const handleDownloadShareCard = async () => {
+    if (!shareCardRef.current) return;
+    try {
+      const dataUrl = await toPng(shareCardRef.current, { quality: 1.0, pixelRatio: 3, skipFonts: false });
+      const link = document.createElement('a');
+      link.download = `ISAI_Story_${currentSong?.title?.slice(0, 15) || 'Track'}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // FEATURE: Dynamic UI & Audio Visualizer
   const [dominantColor, setDominantColor] = useState('#1ed760');
@@ -1444,8 +1472,8 @@ export default function App() {
                         <button onClick={() => setActiveTab('Search')} className="w-10 h-10 bg-white/10 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-white/20 transition-all active:scale-90 border border-white/10">
                           <Search size={18} />
                         </button>
-                        <button onClick={() => setActiveTab('History')} className="w-10 h-10 bg-white/10 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-white/20 transition-all active:scale-90 border border-white/10">
-                          <History size={18} />
+                        <button onClick={() => setActiveTab('Profile')} className="w-10 h-10 bg-white/10 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-white/20 transition-all active:scale-90 border border-white/10">
+                          <User size={18} />
                         </button>
                       </div>
                     </div>
@@ -2012,6 +2040,112 @@ export default function App() {
                 </div>
               </div>
             )}
+
+            {/* DISCOVER (TINDER STYLE SWIPE) VIEW */}
+            {activeTab === 'Discover' && (
+              <div className="flex flex-col h-full bg-[#121212] overflow-hidden">
+                <div className="p-6 pt-12 shrink-0 text-center">
+                  <h1 className="text-2xl font-black text-white flex items-center gap-2 justify-center"><Flame className="text-[#ff4500]" /> Discover</h1>
+                  <p className="text-white/50 text-xs mt-1 font-bold">Swipe Right to Like, Left to Skip</p>
+                </div>
+
+                <div className="flex-1 relative flex items-center justify-center -mt-10 px-6 max-h-[600px]">
+                  {discoverQueue.length > 0 && discoverIndex < discoverQueue.length ? (
+                    <div className="relative w-full max-w-[340px] aspect-[3/4] rounded-[40px] shadow-[0_30px_60px_rgba(0,0,0,0.8)] overflow-hidden bg-[#1a1a1a] border border-white/10 animate-fade-in mx-auto">
+                      <img src={getHighResImage(discoverQueue[discoverIndex].thumbnail)} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
+
+                      {/* Floating Play Button */}
+                      <button
+                        onClick={() => playSong(discoverQueue[discoverIndex])}
+                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 bg-white/20 backdrop-blur-xl rounded-full text-white flex items-center justify-center active:scale-90 transition-all shadow-2xl"
+                      >
+                        <Play size={36} fill="white" className="ml-2" />
+                      </button>
+
+                      <div className="absolute bottom-0 inset-x-0 p-8">
+                        <h2 className="text-white text-2xl font-black leading-tight mb-2 drop-shadow-lg">{discoverQueue[discoverIndex].title}</h2>
+                        <p className="text-white/70 font-semibold mb-6 drop-shadow-lg">{discoverQueue[discoverIndex].artist}</p>
+
+                        <div className="flex items-center justify-between">
+                          <button
+                            onClick={() => {
+                              showToast('Skipped ⏭', 'info');
+                              setDiscoverIndex(prev => prev + 1);
+                            }}
+                            className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-lg flex items-center justify-center text-red-500 hover:bg-white/20 active:scale-90 transition-all"
+                          >
+                            <X size={28} strokeWidth={3} />
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              toggleFavorite(e, discoverQueue[discoverIndex]);
+                              showToast('Liked! Added to Favorites ❤️', 'info');
+                              setDiscoverIndex(prev => prev + 1);
+                            }}
+                            className="w-16 h-16 rounded-full bg-[#8cd92b]/20 backdrop-blur-lg flex items-center justify-center text-[#8cd92b] hover:bg-[#8cd92b]/30 active:scale-90 transition-all shadow-[0_0_20px_rgba(140,217,43,0.3)]"
+                          >
+                            <Heart size={28} fill="currentColor" strokeWidth={0} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center text-white/50 font-bold">
+                      <p className="text-4xl mb-4">🎵</p>
+                      <p>You've swiped them all!</p>
+                      <button onClick={() => setDiscoverIndex(0)} className="mt-4 px-6 py-2 bg-white/10 rounded-full text-white text-sm">Restart Discovery</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* PROFILE (LISTENING STATS) VIEW */}
+            {activeTab === 'Profile' && (
+              <div className="p-6 pt-12 h-full bg-[#121212] overflow-y-auto no-scrollbar">
+                <div className="text-center mb-10">
+                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#8cd92b] to-[#22c7b5] mx-auto p-1 mb-4 shadow-[0_0_30px_rgba(140,217,43,0.3)]">
+                    <img src="/logo.png" className="w-full h-full rounded-full border-4 border-[#121212] object-cover" alt="User" />
+                  </div>
+                  <h2 className="text-2xl font-black text-white">Music Lover</h2>
+                  <p className="text-white/50 text-sm font-bold mt-1">ISAI Premium User</p>
+                </div>
+
+                <h3 className="text-lg font-black text-white mb-4">Your Listening Stats 📊</h3>
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                  <div className="bg-[#1a1c2a] p-5 rounded-3xl border border-white/5">
+                    <Headphones size={24} className="text-[#8cd92b] mb-3" />
+                    <p className="text-white text-3xl font-black">{listenHistory.length}</p>
+                    <p className="text-white/40 text-[11px] font-bold uppercase tracking-wider mt-1">Total Streams</p>
+                  </div>
+                  <div className="bg-[#1a1c2a] p-5 rounded-3xl border border-white/5">
+                    <Clock size={24} className="text-[#22c7b5] mb-3" />
+                    <p className="text-white text-3xl font-black">{Math.floor((listenHistory.length * 4) / 60)}h {(listenHistory.length * 4) % 60}m</p>
+                    <p className="text-white/40 text-[11px] font-bold uppercase tracking-wider mt-1">Time Listened</p>
+                  </div>
+                </div>
+
+                <h3 className="text-lg font-black text-white mb-4">Badges & Achievements 🏆</h3>
+                <div className="space-y-3 mb-10">
+                  <div className="flex items-center gap-4 bg-[#1a1c2a] p-4 rounded-2xl border border-[#ff4500]/30 shadow-[0_5px_20px_rgba(255,69,0,0.1)]">
+                    <div className="w-12 h-12 rounded-xl bg-[#ff4500]/20 flex items-center justify-center text-2xl">🔥</div>
+                    <div>
+                      <h4 className="text-white font-bold">Trending Setter</h4>
+                      <p className="text-white/50 text-xs mt-0.5">Listened to 10+ Top Chart songs.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 bg-[#1a1c2a] p-4 rounded-2xl border border-white/5">
+                    <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-2xl opacity-50">🎸</div>
+                    <div>
+                      <h4 className="text-white font-bold opacity-50">Anirudh Fanatic (Locked)</h4>
+                      <p className="text-white/50 text-xs mt-0.5">Stream Anirudh 50 times to unlock.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -2059,8 +2193,8 @@ export default function App() {
                 <span className="text-[10px] uppercase tracking-widest text-[#a0a0a0]">Now Playing</span>
                 <span className="text-xs truncate max-w-[200px] mx-auto">{currentSong?.title || 'Unknown Title'}</span>
               </div>
-              <button className="p-2 -mr-2 text-white/70 hover:text-white transition-colors">
-                <MoreHorizontal size={24} />
+              <button onClick={() => setShowShareCard(true)} className="p-2 -mr-2 text-white/70 hover:text-white transition-colors">
+                <Instagram size={24} />
               </button>
             </div>
 
@@ -2068,40 +2202,48 @@ export default function App() {
               <div className="flex-1 flex flex-col items-center px-6 relative z-10 w-full overflow-y-auto no-scrollbar pb-24">
                 {/* PREMIUM: Audio Visualizer / Glowing Halo around Image */}
                 <div
+                  onDoubleClick={() => {
+                    setVisualizerMode(prev => (prev + 1) % 3);
+                    showToast(['Visualizer: Equalizer 🎚', 'Visualizer: Halo Pulse 🟢', 'Visualizer: Minimal ⚪'][visualizerMode === 2 ? 0 : visualizerMode + 1]);
+                  }}
                   className={`mt-2 mb-2 w-[min(310px,75vw)] aspect-square relative mx-auto rounded-3xl overflow-hidden bg-[#1a1c2a] shrink-0 border border-[#ffffff1a] transition-all duration-300 ${isPlaying ? 'scale-[1.02]' : 'scale-100'}`}
                   style={{
                     // Dynamic Glowing Halo based on audio bass (audioData[2] is roughly lower frequencies)
-                    boxShadow: isPlaying && audioData.length > 0
-                      ? `0 20px 60px -10px ${dominantColor}${Math.floor((audioData[2] / 255) * 99).toString(16).padStart(2, '0')}, 0 0 ${Math.floor((audioData[2] / 255) * 60)}px ${dominantColor}40`
+                    boxShadow: visualizerMode !== 2 && isPlaying && audioData.length > 0
+                      ? `0 20px 60px -10px ${dominantColor}${Math.floor((audioData[2] / 255) * 99).toString(16).padStart(2, '0')}, 0 0 ${Math.floor((audioData[2] / 255) * 60)}px ${dominantColor}50`
                       : `0 30px 60px rgba(0,0,0,0.7)`
                   }}
                 >
                   <img
                     src={getHighResImage(currentSong.thumbnail)}
                     alt="Cover"
-                    className="w-full h-full object-cover block absolute inset-0 z-0"
+                    className="w-full h-full object-cover block absolute inset-0 z-0 select-none pointer-events-none"
                     onError={(e) => { e.target.src = currentSong.thumbnail || '/logo.png'; }}
                   />
 
                   {/* Equalizer Overlay - REAL-TIME REACTIVE */}
-                  <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end justify-center gap-[3px] px-8 pb-4 z-10 pointer-events-none">
-                    {Array.from({ length: 24 }).map((_, i) => {
-                      // Map audio frequency data to bars
-                      const dataLen = audioData.length || 1;
-                      const value = audioData[i % dataLen] || 0;
-                      const height = (value / 255) * 100;
-                      return (
-                        <div key={i} className="flex-1 max-w-[4px] rounded-full transition-all duration-150"
-                          style={{
-                            height: `${Math.max(12, height)}%`,
-                            backgroundColor: dominantColor,
-                            boxShadow: `0 0 10px ${dominantColor}66`
-                          }}>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  {visualizerMode === 0 && (
+                    <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end justify-center gap-[3px] px-8 pb-4 z-10 pointer-events-none">
+                      {Array.from({ length: 24 }).map((_, i) => {
+                        // Map audio frequency data to bars
+                        const dataLen = audioData.length || 1;
+                        const value = audioData[i % dataLen] || 0;
+                        const height = (value / 255) * 100;
+                        return (
+                          <div key={i} className="flex-1 max-w-[4px] rounded-full transition-all duration-150"
+                            style={{
+                              height: `${Math.max(12, height)}%`,
+                              backgroundColor: dominantColor,
+                              boxShadow: `0 0 10px ${dominantColor}66`
+                            }}>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
+
+                <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mt-1 mb-6">Double tap art to change theme</p>
 
                 {/* Song Info */}
                 <div className="w-full max-w-[340px] mt-12 mb-6 flex items-center gap-3">
@@ -2380,6 +2522,50 @@ export default function App() {
           </div>
         )}
 
+        {/* SHARE CARD / INSTA STORY GENERATOR MODAL */}
+        {showShareCard && currentSong && (
+          <div className="absolute inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-6 animate-fade-in">
+            <button onClick={() => setShowShareCard(false)} className="absolute top-12 right-6 p-3 bg-white/10 rounded-full text-white active:scale-90 transition-all">
+              <X size={24} />
+            </button>
+            <h2 className="text-white text-xl font-bold mb-6">Share to Story</h2>
+
+            {/* The Actual Rendered Card */}
+            <div
+              ref={shareCardRef}
+              className="w-full max-w-[320px] aspect-[9/16] rounded-[32px] relative overflow-hidden shadow-2xl bg-[#121212] flex flex-col border border-white/20"
+            >
+              <img src={getHighResImage(currentSong.thumbnail)} alt="bg" className="absolute inset-0 w-full h-full object-cover opacity-60 blur-2xl scale-[1.5]" />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/60 to-[#121212]" />
+
+              <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-8 text-center mt-10">
+                <img src={getHighResImage(currentSong.thumbnail)} alt="cover" className="w-[200px] h-[200px] rounded-2xl shadow-2xl mb-8 object-cover border border-white/10" />
+                <h3 className="text-white font-black text-2xl leading-tight mb-2 drop-shadow-md">{currentSong.title}</h3>
+                <p className="text-white/70 font-bold text-sm mb-4">{currentSong.artist}</p>
+                <div className="w-full h-1 bg-white/20 rounded-full mt-4 overflow-hidden">
+                  <div className="w-1/2 h-full bg-[#8cd92b]"></div>
+                </div>
+              </div>
+
+              <div className="relative z-10 shrink-0 p-8 pt-0 flex flex-col items-center">
+                <div className="flex items-center gap-2 mb-2">
+                  <img src="/logo.png" alt="logo" className="w-8 h-8 rounded-lg" />
+                  <span className="text-white font-black text-xl italic tracking-tighter">ISAI</span>
+                </div>
+                <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest">Listen exclusively on Play Infinity</p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleDownloadShareCard}
+              className="mt-8 bg-gradient-to-r from-purple-500 to-[#8cd92b] text-black font-black text-lg py-4 px-10 rounded-full flex items-center gap-3 shadow-[0_10px_30px_rgba(140,217,43,0.3)] active:scale-95 transition-all"
+            >
+              <Camera size={24} /> Save to Gallery
+            </button>
+            <p className="text-white/50 text-[11px] font-bold mt-4">Downloads image so you can upload to WhatsApp/Insta</p>
+          </div>
+        )}
+
         {/* Bottom Navigation */}
         <div className="absolute bottom-0 w-full h-[calc(5rem+env(safe-area-inset-bottom))] bg-[#121422]/95 backdrop-blur-xl border-t border-[#262837]/50 flex items-center justify-around px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] rounded-none z-10 shadow-[0_-10px_30px_rgba(0,0,0,0.3)]">
           <button onClick={() => setActiveTab('Home')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-16 h-12 rounded-xl active:scale-90 active:opacity-70 ${activeTab === 'Home' ? 'text-[#8cd92b]' : 'text-gray-500'}`}>
@@ -2387,14 +2573,19 @@ export default function App() {
             {activeTab === 'Home' && <span className="w-1 h-1 rounded-full bg-[#8cd92b] animate-pulse"></span>}
           </button>
 
+          <button onClick={() => setActiveTab('Discover')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-16 h-12 rounded-xl active:scale-90 active:opacity-70 ${activeTab === 'Discover' ? 'text-[#ff4500]' : 'text-gray-500'}`}>
+            <Flame size={20} />
+            {activeTab === 'Discover' && <span className="w-1 h-1 rounded-full bg-[#ff4500] animate-pulse"></span>}
+          </button>
+
           <button onClick={() => setActiveTab('Search')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-16 h-12 rounded-xl active:scale-90 active:opacity-70 ${activeTab === 'Search' ? 'text-[#8cd92b]' : 'text-gray-500'}`}>
             <Search size={20} />
             {activeTab === 'Search' && <span className="w-1 h-1 rounded-full bg-[#8cd92b] animate-pulse"></span>}
           </button>
 
-          <button onClick={() => setActiveTab('Favorites')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-16 h-12 rounded-xl active:scale-90 active:opacity-70 ${activeTab === 'Favorites' ? 'text-[#8cd92b]' : 'text-gray-500'}`}>
-            <Heart size={20} fill={activeTab === 'Favorites' ? 'currentColor' : 'none'} />
-            {activeTab === 'Favorites' && <span className="w-1 h-1 rounded-full bg-[#8cd92b] animate-pulse"></span>}
+          <button onClick={() => setActiveTab('Profile')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-16 h-12 rounded-xl active:scale-90 active:opacity-70 ${activeTab === 'Profile' ? 'text-[#22c7b5]' : 'text-gray-500'}`}>
+            <User size={20} />
+            {activeTab === 'Profile' && <span className="w-1 h-1 rounded-full bg-[#22c7b5] animate-pulse"></span>}
           </button>
 
           <button onClick={() => setActiveTab('Music')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-16 h-12 rounded-xl active:scale-90 active:opacity-70 ${activeTab === 'Music' ? 'text-[#8cd92b]' : 'text-gray-500'}`}>
