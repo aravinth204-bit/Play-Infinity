@@ -203,16 +203,30 @@ export default function App() {
   const applyTamilFilter = (songs) => songs.filter(isTamilSong);
 
   const applyBaseFilter = (songs) => {
-    const BLOCKED = [
+    const BLOCKED_WORDS = [
       'jukebox', 'mashup', 'collection', 'nonstop', 'full album', 'short',
-      'reels', 'reel', 'status', 'news', 'teaser', 'trailer', 'karaoke',
-      'whatsapp', 'ringtone', '8d', 'interview', 'podcast', 'reaction',
+      'reels', 'reel', 'status', 'teaser', 'trailer', 'karaoke',
+      'whatsapp', 'ringtone', '8d', 'podcast', 'reaction',
       'cover', 'promo', 'making of', 'behind the scenes', 'top 10', 'top 50',
       'best of', 'all songs', 'hit list', 'audio jukebox', 'songs list'
     ];
+
+    // Specifically block News and Entertainment gossip channels / keywords
+    const BLOCKED_CHANNELS_AND_NEWS = [
+      'news', 'glitz', 'galatta', 'behindwoods', 'polimer', 'thanthi', 'puthiya thalaimurai',
+      'sun tv', 'vijay tv', 'zee tamil', 'kalaignar', 'captain tv', 'jebam', 'seithigal',
+      'cinema vikatan', 'indiaglitz', 'valai pechu', 'rednool', 'touring talkies',
+      'press meet', 'interview', 'speech', 'audio launch', 'public review'
+    ];
+
     return songs.filter(s => {
-      const t = (s.title || '').toLowerCase();
-      return !BLOCKED.some(kw => t.includes(kw));
+      const title = (s.title || '').toLowerCase();
+      const artist = (s.artist || s.channelTitle || '').toLowerCase();
+      const combinedTxt = title + ' ' + artist;
+
+      if (BLOCKED_WORDS.some(kw => title.includes(kw))) return false;
+      if (BLOCKED_CHANNELS_AND_NEWS.some(kw => combinedTxt.includes(kw))) return false;
+      return true;
     });
   };
 
@@ -382,7 +396,7 @@ export default function App() {
     setDirectorLoading(true);
     setDirectorSongs([]);
     try {
-      const cacheKey = `director_v2_${director.id}`;
+      const cacheKey = `director_v3_${director.id}`; // bump version to invalidate old bad cache
       const cached = sessionStorage.getItem(cacheKey);
       if (cached) {
         setDirectorSongs(JSON.parse(cached));
@@ -393,29 +407,50 @@ export default function App() {
       // Use multi-query parallel fetch if queries array exists, else fall back to single query
       const queryList = director.queries || [director.query];
       const results = await Promise.allSettled(
-        queryList.map(q =>
-          fetch(`${apiEndpoint}?q=${encodeURIComponent(q)}`)
+        queryList.map(q => {
+          // Force strictly Tamil audio, block other languages and junk formats
+          const strictQuery = `${q} tamil audio song -telugu -hindi -malayalam -kannada -status -shorts -reels -jukebox -mashup -nonstop`;
+          return fetch(`${apiEndpoint}?q=${encodeURIComponent(strictQuery)}`)
             .then(r => r.json())
             .then(d => Array.isArray(d) ? d : (d.videos || []))
             .catch(() => [])
-        )
+        })
       );
-      // Flatten all results
-      let combined = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
-      // Deduplicate by video ID first, then by normalized title
+
+      // Flatten all results and shuffle heavily to mix different movies up
+      let rawPool = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+      rawPool = rawPool.sort(() => 0.5 - Math.random());
+
+      // Apply strict Tamil + quality filter first
+      rawPool = applyBaseFilter(applyTamilFilter(rawPool));
+
+      // Deduplicate by ID, normalized title, and similarity (prevent same song)
       const seenIds = new Set();
-      const seenTitles = new Set();
-      combined = combined.filter(s => {
-        if (!s || !s.id) return false;
-        const titleKey = (s.title || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30);
-        if (seenIds.has(s.id) || seenTitles.has(titleKey)) return false;
+      const seenTitleKeys = new Set();
+      const addedTitles = [];
+      const combined = [];
+
+      for (const s of rawPool) {
+        if (!s || !s.id) continue;
+        if (s.durationSeconds && s.durationSeconds < 90) continue;
+        if (s.durationSeconds && s.durationSeconds > 480) continue;
+
+        if (seenIds.has(s.id)) continue;
+
+        const tk = normalizeTitleKey(s.title || '');
+        if (tk && seenTitleKeys.has(tk)) continue;
+
+        // Skip if it is essentially the same song as one we already added
+        if (addedTitles.some(t => isLikelySameSong(s.title, t))) continue;
+
         seenIds.add(s.id);
-        seenTitles.add(titleKey);
-        return true;
-      });
-      // Apply Tamil + quality filter, shuffle slightly, cap at 20
-      combined = applyBaseFilter(applyTamilFilter(combined));
-      combined = combined.sort(() => 0.1 - Math.random()).slice(0, 20);
+        if (tk) seenTitleKeys.add(tk);
+        addedTitles.push(s.title || '');
+        combined.push(s);
+
+        if (combined.length >= 25) break;
+      }
+
       sessionStorage.setItem(cacheKey, JSON.stringify(combined));
       setDirectorSongs(combined);
     } catch (err) {
@@ -512,13 +547,38 @@ export default function App() {
     const bWords = titleTokenSet(currentTitle);
     if (aWords.size === 0 || bWords.size === 0) return false;
 
+    // Exact token overlap
     let overlapCount = 0;
     for (const w of aWords) {
       if (bWords.has(w)) overlapCount++;
     }
 
+    // Fuzzy prefix/substring matching — catches spelling variants like
+    // "mallapuru" vs "mallapur", "thiruchitrambalam" vs "thiruchitrambala"
+    let fuzzyOverlap = 0;
+    for (const w of aWords) {
+      for (const v of bWords) {
+        if (w === v) continue; // already counted above
+        const longer = w.length > v.length ? w : v;
+        const shorter = w.length > v.length ? v : w;
+        // One starts with the other AND shorter is at least 4 chars long
+        if (shorter.length >= 4 && longer.startsWith(shorter)) {
+          fuzzyOverlap++;
+          break;
+        }
+      }
+    }
+
+    const totalOverlap = overlapCount + fuzzyOverlap;
     const similarity = tokenSimilarity(aWords, bWords);
-    return (overlapCount >= 2 && similarity >= 0.5) || similarity >= 0.75;
+
+    // Match if: >=2 overlapping words (incl. fuzzy), or high similarity,
+    // or: 1 fuzzy match + both titles clearly share same lead word
+    return (
+      (totalOverlap >= 2 && (overlapCount + fuzzyOverlap) / Math.min(aWords.size, bWords.size) >= 0.4) ||
+      similarity >= 0.65 ||
+      (fuzzyOverlap >= 1 && overlapCount >= 1)
+    );
   };
 
   const addPlayedTitleTokens = (title = '') => {
@@ -529,6 +589,13 @@ export default function App() {
     if (alreadyExists) return;
 
     playedTitleTokenSetsRef.current = [tokens, ...playedTitleTokenSetsRef.current].slice(0, 80);
+  };
+
+  // ── PREMIUM: High-Res Album Art Helper ─────────────────────────────────────
+  const getHighResImage = (url) => {
+    if (!url) return '';
+    // YouTube thumbnails: replace hqdefault or mqdefault with maxresdefault for 4K/HD
+    return url.replace(/(hqdefault|mqdefault|sddefault)\.jpg/i, 'maxresdefault.jpg');
   };
 
   const favoriteIds = useMemo(() => new Set(favorites.map(s => s.id)), [favorites]);
@@ -854,13 +921,15 @@ export default function App() {
       // Apply Tamil + base quality filter first
       rawPool = applyBaseFilter(applyTamilFilter(rawPool));
 
-      // Deduplicate by ID + normalized title
+      // Deduplicate by ID + normalized title (full key, not just 30 chars)
       const seenIds = new Set([song.id]);
       if (currentSong) seenIds.add(currentSong.id);
       sessionPlayedIds.current.forEach(id => seenIds.add(id));
 
+      // Use full normalized title key to prevent same-song variants slipping through
       const seenTitleKeys = new Set();
-      seenTitleKeys.add((song.title || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30));
+      seenTitleKeys.add(normalizeTitleKey(song.title || ''));
+      if (currentSong) seenTitleKeys.add(normalizeTitleKey(currentSong.title || ''));
 
       const deduped = [];
       for (const s of rawPool) {
@@ -869,25 +938,39 @@ export default function App() {
         // Duration guard: skip very short (<90s) or very long (>7min) tracks
         if (s.durationSeconds && s.durationSeconds < 90) continue;
         if (s.durationSeconds && s.durationSeconds > 480) continue;
-        const titleKey = (s.title || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30);
-        if (seenTitleKeys.has(titleKey)) continue;
-        // Skip if title too similar to current song
+        // Full normalized title key dedup
+        const titleKey = normalizeTitleKey(s.title || '');
+        if (titleKey && seenTitleKeys.has(titleKey)) continue;
+        // Skip if title too similar to the song being played OR to current song
         if (isLikelySameSong(s.title, song.title)) continue;
+        if (currentSong && isLikelySameSong(s.title, currentSong.title)) continue;
         seenIds.add(s.id);
-        seenTitleKeys.add(titleKey);
+        if (titleKey) seenTitleKeys.add(titleKey);
         deduped.push(s);
       }
 
       // Shuffle for variety, cap at 40
       const finalQueue = deduped.sort(() => 0.5 - Math.random()).slice(0, 40);
 
-      // ── MERGE INTO EXISTING QUEUE (no repeats) ───────────────────────────
+      // ── MERGE INTO EXISTING QUEUE (no repeats, check title similarity too) ──
       setQueue(prevQueue => {
         const prevIds = new Set(prevQueue.map(s => s.id));
         prevIds.add(song.id);
         if (currentSong) prevIds.add(currentSong.id);
         sessionPlayedIds.current.forEach(id => prevIds.add(id));
-        const newEntries = finalQueue.filter(s => !prevIds.has(s.id));
+        // Also collect normalized titles of existing queue to prevent title dupes
+        const prevTitleKeys = new Set(prevQueue.map(s => normalizeTitleKey(s.title || '')).filter(Boolean));
+        if (currentSong) prevTitleKeys.add(normalizeTitleKey(currentSong.title || ''));
+        prevTitleKeys.add(normalizeTitleKey(song.title || ''));
+        const newEntries = finalQueue.filter(s => {
+          if (prevIds.has(s.id)) return false;
+          const tk = normalizeTitleKey(s.title || '');
+          if (tk && prevTitleKeys.has(tk)) return false;
+          // Final similarity check against current + played song
+          if (isLikelySameSong(s.title, song.title)) return false;
+          if (currentSong && isLikelySameSong(s.title, currentSong.title)) return false;
+          return true;
+        });
         return [...prevQueue, ...newEntries].slice(0, 60);
       });
 
@@ -1938,7 +2021,12 @@ export default function App() {
               if (swipeTouchStartX.current === null) return;
               const dx = e.changedTouches[0].clientX - swipeTouchStartX.current;
               const dy = e.changedTouches[0].clientY - swipeTouchStartY.current;
-              if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 60) {
+              // PREMIUM: Swipe down to minimize
+              if (dy > Math.abs(dx) && dy > 80) {
+                setActiveTab('Home');
+              }
+              // Swipe left/right for Next/Prev
+              else if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 60) {
                 if (dx < 0) { playNext(); showToast('Next song ⏭', 'info'); }
                 else { playPrev(); showToast('Previous song ⏮', 'info'); }
               }
@@ -1946,13 +2034,20 @@ export default function App() {
               swipeTouchStartY.current = null;
             }}
           >
-            {/* Gradient Background tied to Album Art */}
-            <div
-              className="absolute inset-0 z-0 opacity-50 blur-[100px] scale-150 pointer-events-none transition-all duration-1000"
-              style={{ background: `radial-gradient(circle at center, ${dominantColor}cc 0%, #121212 100%)` }}
-            ></div>
-            <div className="absolute inset-0 bg-black/40 z-0 pointer-events-none"></div>
-
+            {/* PREMIUM BACKGROUND: Immersive Blurred Background (Apple Music Style) */}
+            {currentSong && (
+              <>
+                <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+                  <img src={getHighResImage(currentSong.thumbnail)} alt="bg" className="w-full h-full object-cover scale-[1.5] blur-[80px] opacity-60 transition-all duration-1000" />
+                </div>
+                {/* Dynamic Gradient Overlay */}
+                <div
+                  className="absolute inset-0 z-0 opacity-80 pointer-events-none mix-blend-multiply transition-all duration-1000"
+                  style={{ background: `linear-gradient(to bottom, transparent 0%, #121212 90%)` }}
+                ></div>
+                <div className="absolute inset-0 z-0 bg-black/30 pointer-events-none"></div>
+              </>
+            )}
             <div className="flex items-center justify-between p-5 pt-10 z-10 relative">
               <button onClick={() => setActiveTab('Home')} className="p-2 -ml-2 text-white/70 hover:text-white transition-all active:scale-75">
                 <ArrowLeft size={24} />
@@ -1968,13 +2063,21 @@ export default function App() {
 
             {currentSong ? (
               <div className="flex-1 flex flex-col items-center px-6 relative z-10 w-full overflow-y-auto no-scrollbar pb-24">
-                {/* Album Art Square Banner with Equalizer Overlay */}
-                <div className={`mt-2 mb-2 w-[min(310px,75vw)] aspect-square relative mx-auto rounded-3xl overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.7)] bg-[#1a1c2a] shrink-0 border border-[#ffffff0a] transition-all duration-1000 ${isPlaying ? 'animate-slow-pulse scale-[1.02]' : 'scale-100'}`}>
+                {/* PREMIUM: Audio Visualizer / Glowing Halo around Image */}
+                <div
+                  className={`mt-2 mb-2 w-[min(310px,75vw)] aspect-square relative mx-auto rounded-3xl overflow-hidden bg-[#1a1c2a] shrink-0 border border-[#ffffff1a] transition-all duration-300 ${isPlaying ? 'scale-[1.02]' : 'scale-100'}`}
+                  style={{
+                    // Dynamic Glowing Halo based on audio bass (audioData[2] is roughly lower frequencies)
+                    boxShadow: isPlaying && audioData.length > 0
+                      ? `0 20px 60px -10px ${dominantColor}${Math.floor((audioData[2] / 255) * 99).toString(16).padStart(2, '0')}, 0 0 ${Math.floor((audioData[2] / 255) * 60)}px ${dominantColor}40`
+                      : `0 30px 60px rgba(0,0,0,0.7)`
+                  }}
+                >
                   <img
-                    src={currentSong.thumbnail}
+                    src={getHighResImage(currentSong.thumbnail)}
                     alt="Cover"
                     className="w-full h-full object-cover block absolute inset-0 z-0"
-                    onError={(e) => { e.target.src = '/logo.jpg'; }}
+                    onError={(e) => { e.target.src = currentSong.thumbnail || '/logo.png'; }}
                   />
 
                   {/* Equalizer Overlay - REAL-TIME REACTIVE */}
@@ -2239,50 +2342,35 @@ export default function App() {
           </div>
         )}
 
-        {/* MOBILE MINI PLAYER */}
+        {/* PREMIUM MOBILE MINI PLAYER (Floating Control with sleek Glassmorphism) */}
         {currentSong && activeTab !== 'Music' && (
           <div
             onClick={() => setActiveTab('Music')}
-            className="absolute bottom-24 left-4 right-4 bg-[#1a1c2a]/70 backdrop-blur-xl rounded-2xl p-2.5 flex items-center gap-3 border border-white/10 shadow-[0_15px_35px_rgba(0,0,0,0.5)] z-40 cursor-pointer animate-slide-up"
+            className="absolute bottom-[88px] left-3 right-3 bg-black/50 backdrop-blur-2xl rounded-[20px] p-2 flex items-center gap-3 border border-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.6)] z-40 cursor-pointer animate-slide-up overflow-hidden group"
           >
-            <div className="relative shrink-0 transition-transform active:scale-95">
-              <img src={currentSong.thumbnail} alt="" className={`w-11 h-11 rounded-lg object-cover ${isPlaying ? 'animate-slow-pulse' : ''} border border-white/10`} />
-              {isPlaying && (
-                <div
-                  className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center border-2 border-[#121422] shadow-[0_0_8px_rgba(0,0,0,0.5)]"
-                  style={{ backgroundColor: dominantColor }}
-                >
-                  <div className="w-1.5 h-1.5 bg-[#121422] rounded-full animate-ping"></div>
-                </div>
-              )}
+            {/* Mini Progress Bar Line at bottom */}
+            <div className="absolute bottom-0 left-0 h-[2px] bg-white/20 w-full">
+              <div
+                className="h-full bg-[#8cd92b] transition-all duration-200"
+                style={{ width: `${(progress / (duration || 1)) * 100}%`, boxShadow: '0 0 10px #8cd92b' }}
+              />
             </div>
 
-            <div className="flex-1 overflow-hidden">
-              <h4 className="text-white text-[13px] font-bold truncate leading-tight">{currentSong.title}</h4>
-              <p className="text-[10px] text-white/50 truncate mt-0.5">{currentSong.artist}</p>
+            <div className="relative w-12 h-12 shrink-0 transition-transform active:scale-95">
+              <img src={currentSong.thumbnail} alt="" className={`w-full h-full rounded-[14px] object-cover shadow-md ${isPlaying ? 'animate-slow-pulse' : ''}`} />
             </div>
 
-            <div className="flex items-center gap-1 shrink-0 px-1">
-              <button
-                onClick={(e) => { e.stopPropagation(); playPrev(); }}
-                className="p-1.5 text-white/70 hover:text-white transition-all active:scale-75"
-              >
-                <SkipBack size={16} fill="currentColor" />
-              </button>
+            <div className="flex-1 overflow-hidden py-1">
+              <h4 className="text-white text-[13px] font-bold truncate leading-tight drop-shadow-md">{cleanTitle(currentSong.title)}</h4>
+              <p className="text-[10px] text-white/50 truncate mt-0.5 drop-shadow-sm">{currentSong.artist?.replace(/ - Topic| VEVO/gi, '')}</p>
+            </div>
 
-              <button
-                onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                className="w-10 h-10 flex items-center justify-center bg-white rounded-full text-black shadow-lg hover:scale-105 active:scale-90 transition-all"
-                style={{ boxShadow: isPlaying ? `0 0 15px ${dominantColor}66` : undefined }}
-              >
+            <div className="flex items-center gap-2 shrink-0 pr-2">
+              <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="w-10 h-10 flex items-center justify-center bg-white rounded-full text-black hover:scale-105 active:scale-90 transition-all shadow-lg" >
                 {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
               </button>
-
-              <button
-                onClick={(e) => { e.stopPropagation(); playNext(); }}
-                className="p-1.5 text-white/70 hover:text-white transition-all active:scale-75"
-              >
-                <SkipForward size={16} fill="currentColor" />
+              <button onClick={(e) => { e.stopPropagation(); playNext(); }} className="w-8 h-8 flex items-center justify-center text-white/80 hover:text-white transition-all active:scale-75">
+                <SkipForward size={20} fill="currentColor" />
               </button>
             </div>
           </div>
