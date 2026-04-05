@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 // Build ID: 2026-03-05-MEGAUPDATE
 import ReactPlayer from 'react-player';
-import { Home, Music, Search, User, Play, Pause, SkipBack, SkipForward, Heart, MoreHorizontal, ArrowLeft, Shuffle, Repeat, Upload, List, Headphones, Book, Download, Clock, Settings, LogOut, Bell, ChevronRight, ChevronUp, ChevronDown, Plus, X, FolderPlus, Mic2, Share2, Wifi, WifiOff, History, Gauge, CheckCircle2, Camera, Instagram, Flame, Award, BarChart2 } from 'lucide-react';
+import { Home, Music, Search, User, Play, Pause, SkipBack, SkipForward, Heart, MoreHorizontal, ArrowLeft, Shuffle, Repeat, Upload, List, Headphones, Book, Download, Clock, Settings, LogOut, Bell, ChevronRight, ChevronUp, ChevronDown, Plus, X, FolderPlus, Mic2, Share2, Wifi, WifiOff, History, Gauge, CheckCircle2, Camera, Instagram, Flame, Award, BarChart2, Trash2, FileText } from 'lucide-react';
 import { formatTime } from './utils';
 import { toPng } from 'html-to-image';
 
@@ -93,7 +93,7 @@ const DesktopSongRow = React.memo(function DesktopSongRow({
 });
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('Home');
+
   const [currentSong, setCurrentSong] = useState(null);
   const [useIframeFallback, setUseIframeFallback] = useState(false);
   const [songs, setSongs] = useState([]);
@@ -114,26 +114,41 @@ export default function App() {
 
 
   const [searchHistory, setSearchHistory] = useState(() => {
-    const saved = localStorage.getItem('musicHistory');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('musicHistory');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   });
 
   const [favorites, setFavorites] = useState(() => {
-    const saved = localStorage.getItem('musicFavorites');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('musicFavorites');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   });
 
   const [playlists, setPlaylists] = useState(() => {
-    const saved = localStorage.getItem('musicPlaylists');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', name: 'Your Top Hits', isAuto: true, songs: [] },
-      { id: '2', name: 'Trending Vibes', isAuto: true, songs: [] }
-    ];
+    try {
+      const saved = localStorage.getItem('musicPlaylists');
+      return saved ? (Array.isArray(JSON.parse(saved)) ? JSON.parse(saved) : []) : [
+        { id: '1', name: 'Your Top Hits', isAuto: true, songs: [] },
+        { id: '2', name: 'Trending Vibes', isAuto: true, songs: [] }
+      ];
+    } catch {
+      return [
+        { id: '1', name: 'Your Top Hits', isAuto: true, songs: [] },
+        { id: '2', name: 'Trending Vibes', isAuto: true, songs: [] }
+      ];
+    }
   });
 
   const [showPlaylistModal, setShowPlaylistModal] = useState({ isOpen: false, songInfo: null });
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [currentViewPlaylist, setCurrentViewPlaylist] = useState(null);
+  const [activeTab, setActiveTab] = useState('Home');
+  const [isPlayerExpanded, setIsPlayerExpanded] = useState(false);
+  const [showSongOptions, setShowSongOptions] = useState(null);
+  const [activeCategory, setActiveCategory] = useState('All');
 
   // Additional feature states
   const [sleepTimer, setSleepTimer] = useState(null);
@@ -191,7 +206,7 @@ export default function App() {
   };
 
   // FEATURE: Dynamic UI & Audio Visualizer
-  const [dominantColor, setDominantColor] = useState('#1ed760');
+  const [dominantColor, setDominantColor] = useState('#8cd92b');
   const [audioData, setAudioData] = useState(new Uint8Array(32).fill(0));
   const analyserRef = useRef(null);
   const audioCtxRef = useRef(null);
@@ -302,7 +317,7 @@ export default function App() {
   // ──────────────────────────────────────────────────────
   const MUSIC_DIRECTORS = [
     {
-      id: 'anirudh', name: 'Anirudh', color: 'from-[#f97316] to-[#ef4444]', emoji: '🎸', subtitle: 'Music Director',
+      id: 'anirudh', name: 'Anirudh', color: 'from-[#8cd92b] to-[#22c7b5]', emoji: '🎸', subtitle: 'Music Director',
       query: 'Anirudh Ravichander tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
         'Anirudh Ravichander Vijay songs tamil audio',
@@ -312,7 +327,7 @@ export default function App() {
       ]
     },
     {
-      id: 'arrahman', name: 'A.R. Rahman', color: 'from-[#6366f1] to-[#8b5cf6]', emoji: '🎹', subtitle: 'Music Director',
+      id: 'arrahman', name: 'A.R. Rahman', color: 'from-[#8cd92b] to-[#22c7b5]', emoji: '🎹', subtitle: 'Music Director',
       query: 'AR Rahman tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
         'AR Rahman Roja Bombay tamil songs audio',
@@ -322,7 +337,7 @@ export default function App() {
       ]
     },
     {
-      id: 'harris', name: 'Harris Jayaraj', color: 'from-[#0ea5e9] to-[#6366f1]', emoji: '🎻', subtitle: 'Music Director',
+      id: 'harris', name: 'Harris Jayaraj', color: 'from-[#8cd92b] to-[#22c7b5]', emoji: '🎻', subtitle: 'Music Director',
       query: 'Harris Jayaraj tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
         'Harris Jayaraj Ghajini Kaakha Kaakha songs',
@@ -332,7 +347,7 @@ export default function App() {
       ]
     },
     {
-      id: 'yuvan', name: 'Yuvan Shankar Raja', color: 'from-[#10b981] to-[#0ea5e9]', emoji: '🎵', subtitle: 'Music Director',
+      id: 'yuvan', name: 'Yuvan Shankar Raja', color: 'from-[#8cd92b] to-[#22c7b5]', emoji: '🎵', subtitle: 'Music Director',
       query: 'Yuvan Shankar Raja tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
         'Yuvan Shankar Raja Mankatha Billa songs',
@@ -342,7 +357,7 @@ export default function App() {
       ]
     },
     {
-      id: 'deva', name: 'Deva', color: 'from-[#ec4899] to-[#f97316]', emoji: '🥁', subtitle: 'Music Director',
+      id: 'deva', name: 'Deva', color: 'from-[#8cd92b] to-[#22c7b5]', emoji: '🥁', subtitle: 'Music Director',
       query: 'Deva tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
         'Deva Rajinikanth Murasoli Muthal Mariyathai songs',
@@ -352,7 +367,7 @@ export default function App() {
       ]
     },
     {
-      id: 'ilayaraja', name: 'Ilaiyaraaja', color: 'from-[#f59e0b] to-[#ec4899]', emoji: '🎼', subtitle: 'Music Director',
+      id: 'ilayaraja', name: 'Ilaiyaraaja', color: 'from-[#8cd92b] to-[#22c7b5]', emoji: '🎼', subtitle: 'Music Director',
       query: 'Ilaiyaraaja evergreen tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
         'Ilaiyaraaja Moondram Pirai Ninaithale Innikkum songs',
@@ -362,7 +377,7 @@ export default function App() {
       ]
     },
     {
-      id: 'gv', name: 'G.V. Prakash', color: 'from-[#14b8a6] to-[#22c55e]', emoji: '🎤', subtitle: 'Music Director',
+      id: 'gv', name: 'G.V. Prakash', color: 'from-[#8cd92b] to-[#22c7b5]', emoji: '🎤', subtitle: 'Music Director',
       query: 'GV Prakash Kumar tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
         'GV Prakash Aadukalam Mynaa songs tamil',
@@ -372,7 +387,7 @@ export default function App() {
       ]
     },
     {
-      id: 'sid', name: 'Sid Sriram', color: 'from-[#a855f7] to-[#ec4899]', emoji: '🎧', subtitle: 'Top Singer',
+      id: 'sid', name: 'Sid Sriram', color: 'from-[#8cd92b] to-[#22c7b5]', emoji: '🎧', subtitle: 'Top Singer',
       query: 'Sid Sriram tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
         'Sid Sriram Kannaana Kanney tamil songs',
@@ -397,7 +412,7 @@ export default function App() {
     {
       id: 'trending_now',
       name: 'Trending Now',
-      color: 'from-[#ff007f] to-[#ff7f00]',
+      color: 'from-[#8cd92b] to-[#22c7b5]',
       emoji: '🔥',
       subtitle: 'Current Hits',
       query: 'Anirudh tamil hit songs 2024 trending audio',
@@ -411,7 +426,7 @@ export default function App() {
     {
       id: '2k_kids',
       name: '2K Kids',
-      color: 'from-[#00f2fe] to-[#4facfe]',
+      color: 'from-[#8cd92b] to-[#22c7b5]',
       emoji: '🎧',
       subtitle: 'After 2015',
       query: 'Anirudh Mersal Bigil tamil songs audio',
@@ -425,7 +440,7 @@ export default function App() {
     {
       id: '90s_hits',
       name: '90s Hits',
-      color: 'from-[#f6d365] to-[#fda085]',
+      color: 'from-[#8cd92b] to-[#22c7b5]',
       emoji: '📼',
       subtitle: '1990 – 2015',
       query: 'AR Rahman 90s tamil songs Roja Bombay audio',
@@ -439,7 +454,7 @@ export default function App() {
     {
       id: '80s_classics',
       name: '80s Classics',
-      color: 'from-[#d4fc79] to-[#96e6a1]',
+      color: 'from-[#8cd92b] to-[#22c7b5]',
       emoji: '📻',
       subtitle: 'Before 1990',
       query: 'Ilaiyaraaja classic 80s tamil songs audio',
@@ -543,7 +558,7 @@ export default function App() {
           ctx.drawImage(img, 0, 0, size, size);
           const data = ctx.getImageData(0, 0, size, size).data;
 
-          let bestR = 30, bestG = 215, bestB = 96; // fallback green
+          let bestR = 140, bestG = 217, bestB = 43; // fallback green
           let bestScore = -1;
 
           // Sample pixels and find the most vibrant/bright non-dark one
@@ -574,10 +589,10 @@ export default function App() {
 
           resolve(`rgb(${bestR}, ${bestG}, ${bestB})`);
         } catch {
-          resolve('#1ed760');
+          resolve('#8cd92b');
         }
       };
-      img.onerror = () => resolve('#1ed760');
+      img.onerror = () => resolve('#8cd92b');
     });
   };
 
@@ -1113,7 +1128,7 @@ export default function App() {
     setProgress(0);
     setCurrentSong(song);
     setIsPlaying(true);
-    setActiveTab('Music');
+    setIsPlayerExpanded(true);
     setUseIframeFallback(false);
 
     sessionPlayedIds.current.add(song.id);
@@ -1426,7 +1441,7 @@ export default function App() {
   // No native player needed for web PWA
 
   return (
-    <div className="flex items-center justify-center bg-gray-900 overflow-hidden font-['Outfit']" style={{ height: '100dvh' }}>
+    <div className="flex items-center justify-center bg-black overflow-hidden font-['Outfit'] aurora-bg" style={{ height: '100dvh' }}>
 
       {/* Invisible HTML5 Audio to keep browser session alive for iOS/Android Background playing */}
       <audio ref={silentAudioRef} loop playsInline src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=" />
@@ -1456,8 +1471,8 @@ export default function App() {
         </div>
       )}
 
-      {/* App Container - Mobile Layout (Dark Theme) */}
-      <div className="w-full h-full max-w-[450px] bg-[#121212] shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden flex flex-col md:hidden text-[#a0a3b1] sm:rounded-none sm:scale-100">
+      {/* App Container - Mobile Layout (Premium Dark Theme) */}
+      <div className="w-full h-[100dvh] max-w-[450px] bg-black shadow-2xl relative overflow-hidden flex flex-col md:hidden text-white/70">
 
         {/* Toast Notifications */}
         <div className="absolute top-4 left-0 right-0 z-[100] flex flex-col items-center gap-2 pointer-events-none px-4">
@@ -1478,158 +1493,235 @@ export default function App() {
 
 
         {/* Mobile Main Content Area */}
-        {activeTab !== 'Music' && (
-          <div
-            className="flex-1 overflow-y-auto no-scrollbar overscroll-contain scroll-smooth"
-            style={{ paddingBottom: currentSong ? 'calc(9.5rem + env(safe-area-inset-bottom))' : 'calc(5.5rem + env(safe-area-inset-bottom))' }}
-          >
-            {/* HOME VIEW */}
-            {activeTab === 'Home' && (() => {
-              const hour = new Date().getHours();
-              const greeting = hour < 12 ? 'Good Morning ☀️' : hour < 17 ? 'Good Afternoon 🌤️' : hour < 21 ? 'Good Evening 🌆' : 'Good Night 🌙';
-              return (
-                <div className="overflow-x-hidden animate-fade-in">
-                  {/* Hero Header with dynamic gradient */}
-                  <div className="relative px-5 pt-12 pb-6 overflow-hidden" style={{ background: `linear-gradient(160deg, ${dominantColor}55 0%, #1a1a1a 60%, #121212 100%)` }}>
-                    {/* Decorative blobs */}
-                    <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full blur-3xl opacity-30 pointer-events-none" style={{ background: dominantColor }} />
-                    <div className="absolute top-20 -left-10 w-32 h-32 rounded-full blur-2xl opacity-20 pointer-events-none" style={{ background: dominantColor }} />
+        <div
+          className="flex-1 overflow-y-auto no-scrollbar overscroll-contain scroll-smooth"
+          style={{ paddingBottom: currentSong ? 'calc(9.5rem + env(safe-area-inset-bottom))' : 'calc(5.5rem + env(safe-area-inset-bottom))' }}
+        >
+          {/* HOME VIEW */}
+          {activeTab === 'Home' && (() => {
+            const hour = new Date().getHours();
+            const greeting = hour < 12 ? 'Good Morning ☀️' : hour < 17 ? 'Good Afternoon 🌤️' : hour < 21 ? 'Good Evening 🌆' : 'Good Night 🌙';
+            return (
+              <div className="overflow-x-hidden animate-fade-in">
+                {/* Editorial Hero Header */}
+                <div className="relative px-6 pt-12 pb-10 overflow-hidden mesh-gradient">
+                  <div className="absolute inset-0 bg-black/20" />
 
-                    {/* Top Bar */}
-                    <div className="flex items-center justify-between mb-6 relative z-10">
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <img src="/logo.png" alt="Logo" className="w-11 h-11 rounded-2xl shadow-lg shrink-0" />
-                          {isPlaying && <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#8cd92b] rounded-full border-2 border-[#121212] animate-pulse" />}
-                        </div>
-                        <div>
-                          <p className="text-white/50 text-[11px] font-semibold uppercase tracking-widest">{greeting}</p>
-                          <p className="text-white text-xl font-black tracking-tight">ISAI <span className="text-[#8cd92b]">இசை</span></p>
-                        </div>
+                  {/* Top Bar */}
+                  <div className="flex items-center justify-between mb-8 relative z-10">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <img src="/logo.png" alt="Logo" className="w-12 h-12 rounded-[18px] shadow-2xl border border-white/10" />
+                        {isPlaying && <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#8cd92b] rounded-full border-[3px] border-black animate-pulse" />}
                       </div>
-                      <div className="flex gap-2 relative z-10">
-                        <button onClick={() => setActiveTab('Search')} className="w-10 h-10 bg-white/10 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-white/20 transition-all active:scale-90 border border-white/10">
-                          <Search size={18} />
-                        </button>
-                        <button onClick={() => setActiveTab('Profile')} className="w-10 h-10 bg-white/10 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-white/20 transition-all active:scale-90 border border-white/10">
-                          <User size={18} />
-                        </button>
+                      <div>
+                        <p className="text-white/40 text-[10px] font-bold uppercase tracking-[2px]">{greeting}</p>
+                        <h1 className="text-2xl font-black tracking-tighter text-white">ISAI <span className="text-[#8cd92b]">இசை</span></h1>
                       </div>
                     </div>
-
-                    {/* Currently Playing Hero Card (if song is playing) */}
-                    {currentSong && (
-                      <div onClick={() => setActiveTab('Music')} className="relative bg-black/30 backdrop-blur-xl rounded-3xl p-4 flex items-center gap-4 cursor-pointer border border-white/10 active:scale-[0.98] transition-all shadow-xl">
-                        <div className={`relative shrink-0 ${isPlaying ? 'animate-slow-pulse' : ''}`}>
-                          <img src={currentSong.thumbnail} alt="" className="w-16 h-16 rounded-2xl object-cover shadow-lg" />
-                          {isPlaying && (
-                            <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center">
-                              <div className="flex gap-[3px] items-end h-5">
-                                {[0, 1, 2, 3].map(b => <div key={b} className="w-[3px] rounded-full bg-[#8cd92b]" style={{ height: `${6 + Math.sin(Date.now() / 200 + b) * 6}px`, animation: `bounce ${0.4 + b * 0.1}s ease-in-out infinite alternate` }} />)}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 overflow-hidden">
-                          <p className="text-[10px] uppercase tracking-widest font-bold" style={{ color: dominantColor }}>{isPlaying ? '▶ Now Playing' : '⏸ Paused'}</p>
-                          <h3 className="text-white font-bold text-sm truncate mt-0.5">{currentSong.title}</h3>
-                          <p className="text-white/50 text-xs truncate mt-0.5">{currentSong.artist}</p>
-                        </div>
-                        <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center flex-shrink-0 shadow-md active:scale-90 transition-all">
-                          {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex gap-2.5">
+                      <button onClick={() => setActiveTab('Search')} className="w-11 h-11 glass flex items-center justify-center rounded-2xl active:scale-95 transition-all">
+                        <Search size={20} className="text-white" />
+                      </button>
+                      <button onClick={() => setActiveTab('Profile')} className="w-11 h-11 glass flex items-center justify-center rounded-2xl active:scale-95 transition-all">
+                        <User size={20} className="text-white" />
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Quick Access Grid */}
-                  <div className="px-4 mt-4">
-                    <div className="grid grid-cols-2 gap-2 mb-6">
-                      {[
-                        { label: 'Liked Songs', icon: <Heart size={18} fill="white" className="text-white" />, gradient: 'from-[#4b22c7] to-[#a680ff]', action: () => setActiveTab('Favorites'), count: `${favorites.length} songs` },
-                        { label: 'Recently Played', icon: <History size={18} className="text-white" />, gradient: 'from-[#c7225a] to-[#ff6b6b]', action: () => setActiveTab('History'), count: `${listenHistory.length} songs` },
-                        { label: 'Playlists', icon: <List size={18} className="text-white" />, gradient: 'from-[#226ac7] to-[#6bb8ff]', action: () => setActiveTab('Playlists'), count: `${playlists.length} playlists` },
-                        { label: 'Search Music', icon: <Search size={18} className="text-white" />, gradient: 'from-[#22b5c7] to-[#6bffeb]', action: () => setActiveTab('Search'), count: 'Find anything' },
-                      ].map((item, i) => (
-                        <div key={i} onClick={item.action} className="flex items-center bg-[#1e1e1e] rounded-xl overflow-hidden cursor-pointer active:scale-95 transition-all h-14 shadow-md border border-white/5">
-                          <div className={`w-14 h-14 bg-gradient-to-br ${item.gradient} shrink-0 flex items-center justify-center`}>
-                            {item.icon}
+                  {/* Featured Spotlight Card */}
+                  <div className="relative z-10 animate-slide-up-premium">
+                    <h2 className="text-xs font-black text-[#8cd92b] uppercase tracking-[3px] mb-3">Featured Playlist</h2>
+                    <div onClick={() => setActiveTab('Search')} className="bg-gradient-to-br from-white/10 to-transparent backdrop-blur-md rounded-[32px] p-6 border border-white/10 shadow-2xl group cursor-pointer active:scale-[0.98] transition-all overflow-hidden">
+                      <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-[#8cd92b] rounded-full blur-[60px] opacity-20 pointer-events-none" />
+                      <div className="flex items-center gap-5">
+                        <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-2xl shrink-0 border border-white/10">
+                          <img src={trendingSongs[0]?.thumbnail || "/logo.png"} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-xl font-black text-white leading-tight mb-2">Tamil Hits <br /> 2025</h3>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-1 bg-[#8cd92b]/20 text-[#8cd92b] text-[10px] font-black rounded-lg">TRENDING</span>
+                            <span className="text-white/50 text-xs font-bold">Listen Now</span>
                           </div>
-                          <div className="px-2.5 flex-1 overflow-hidden">
-                            <p className="text-white text-[11px] font-bold truncate">{item.label}</p>
-                            <p className="text-white/40 text-[9px] mt-0.5">{item.count}</p>
+                        </div>
+                        <div className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center shrink-0 shadow-xl group-hover:scale-110 transition-transform">
+                          <Play size={20} fill="black" className="ml-1" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Interactive Category Chips */}
+                <div className="px-6 mt-6 overflow-x-auto flex gap-3 no-scrollbar pb-2">
+                  {['All', '90s Hits', 'Anirudh', 'AR Rahman', 'Romantic', 'Dance', 'Harris Jayaraj', 'Melody', '80s Classic'].map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => {
+                        setActiveCategory(cat);
+                        if (cat !== 'All') {
+                          setSearchQuery(cat);
+                          handleSearch(cat);
+                        } else {
+                          setSearchQuery('');
+                        }
+                      }}
+                      className={`px-5 py-2.5 rounded-2xl text-[11px] font-black tracking-widest whitespace-nowrap transition-all border ${activeCategory === cat ? 'bg-[#8cd92b] text-black border-[#8cd92b] shadow-[0_8px_20px_rgba(140,217,43,0.3)]' : 'glass border-white/10 text-white/40'}`}
+                    >
+                      {cat.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Quick Access Grid */}
+                <div className="px-6 mt-8">
+                  <div className="grid grid-cols-2 gap-3 mb-8">
+                    {[
+                      { label: 'Liked Songs', icon: <Heart size={20} fill="#8cd92b" stroke="#8cd92b" />, action: () => setActiveTab('Favorites'), count: `${favorites.length} TRACKS` },
+                      { label: 'History', icon: <History size={20} className="text-[#22c7b5]" />, action: () => setActiveTab('History'), count: `${listenHistory.length} RECENT` },
+                      { label: 'Playlists', icon: <List size={20} className="text-[#8cd92b]" />, action: () => setActiveTab('Playlists'), count: `${playlists.length} LISTS` },
+                      { label: 'Discover', icon: <Search size={20} className="text-[#22c7b5]" />, action: () => setActiveTab('Search'), count: 'NEW MUSIC' },
+                    ].map((item, i) => (
+                      <div key={i} onClick={item.action} className="glass-card rounded-[24px] p-4 flex flex-col justify-between h-28 cursor-pointer shadow-lg active:scale-95 transition-all">
+                        <div className="w-10 h-10 glass rounded-xl flex items-center justify-center shrink-0">
+                          {item.icon}
+                        </div>
+                        <div>
+                          <p className="text-white text-sm font-black tracking-tight">{item.label}</p>
+                          <p className="text-white/30 text-[9px] font-bold tracking-widest">{item.count}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Currently Playing Card (Collapsible style) */}
+                  {currentSong && (
+                    <div onClick={() => setIsPlayerExpanded(true)} className="mb-10 animate-fade-in">
+                      <h2 className="text-[10px] font-black text-white/40 uppercase tracking-[3px] mb-4">Jump Back In</h2>
+                      <div className="glass-card rounded-[28px] p-4 flex items-center gap-4 relative overflow-hidden group">
+                        <div className="absolute inset-0 bg-gradient-to-r from-[#8cd92b]/10 to-transparent pointer-events-none" />
+                        <div className="w-16 h-16 rounded-[20px] overflow-hidden shadow-2xl shrink-0 group-active:scale-90 transition-transform">
+                          <img src={currentSong.thumbnail} className="w-full h-full object-cover" alt="" />
+                        </div>
+                        <div className="flex-1 overflow-hidden pr-2">
+                          <p className="text-[#8cd92b] text-[9px] font-black uppercase tracking-widest leading-none mb-1">STILL PLAYING</p>
+                          <h4 className="text-white text-sm font-bold truncate">{cleanTitle(currentSong.title)}</h4>
+                          <p className="text-white/40 text-xs truncate mt-0.5">{currentSong.artist}</p>
+                        </div>
+                        <div className="w-10 h-10 glass rounded-full flex items-center justify-center group-active:scale-90 transition-transform">
+                          <Play size={18} fill="white" className="text-white ml-0.5" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 🎬 Music Directors */}
+                  <div className="mb-10">
+                    <div className="flex items-center justify-between px-2 mb-5">
+                      <h2 className="text-lg font-black text-white tracking-tight">🎬 Music Directors</h2>
+                      <span className="text-[10px] text-[#8cd92b] font-black uppercase tracking-widest bg-[#8cd92b]/10 px-2.5 py-1 rounded-full">Explore</span>
+                    </div>
+                    <div className="flex overflow-x-auto gap-4 no-scrollbar pb-2 px-1">
+                      {MUSIC_DIRECTORS.map((director) => (
+                        <div
+                          key={director.id}
+                          onClick={() => fetchDirectorSongs(director)}
+                          className="flex flex-col items-center gap-3 shrink-0 active:scale-95 transition-all group"
+                        >
+                          <div className={`w-20 h-20 rounded-[28px] bg-gradient-to-br ${director.color} flex items-center justify-center text-3xl shadow-xl border border-white/20 group-active:rotate-3 group-active:scale-90 transition-all`}>
+                            <span className="drop-shadow-2xl">{director.emoji}</span>
+                          </div>
+                          <span className="text-white text-[11px] font-black text-center leading-tight w-20 truncate">{director.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 🕰️ Era Collections */}
+                  <div className="mb-10">
+                    <div className="flex items-center justify-between px-2 mb-5">
+                      <h2 className="text-lg font-black text-white tracking-tight">🕰️ Time Travel</h2>
+                      <span className="text-[10px] text-white/30 font-black uppercase tracking-widest">Era Magic</span>
+                    </div>
+                    <div className="flex overflow-x-auto gap-4 no-scrollbar pb-2 px-1">
+                      {ERA_COLLECTIONS.map((era) => (
+                        <div
+                          key={era.id}
+                          onClick={() => fetchDirectorSongs(era)}
+                          className="flex-shrink-0 w-44 h-24 rounded-[30px] relative overflow-hidden cursor-pointer active:scale-95 transition-all shadow-2xl group border border-white/10"
+                        >
+                          <div className={`absolute inset-0 bg-gradient-to-br ${era.color} opacity-90`} />
+                          <div className="absolute inset-0 bg-black/20" />
+                          <div className="absolute inset-0 p-5 flex flex-col justify-between">
+                            <span className="text-2xl drop-shadow-2xl group-active:scale-125 transition-transform">{era.emoji}</span>
+                            <div>
+                              <h3 className="text-white font-black text-base italic leading-none">{era.name}</h3>
+                              <p className="text-white/70 text-[9px] font-black uppercase tracking-widest mt-1">{era.subtitle}</p>
+                            </div>
                           </div>
                         </div>
                       ))}
                     </div>
+                  </div>
 
-                    {/* 🎬 Music Directors */}
+                  {/* Jump Back In */}
+                  {(searchHistory.length > 0 || listenHistory.length > 0) && (
                     <div className="mb-6">
                       <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-base font-bold text-white">🎬 Music Directors</h2>
-                        <span className="text-[10px] text-white/30 font-semibold">Tamil Only</span>
+                        <h2 className="text-base font-bold text-white">Jump Back In</h2>
+                        <button onClick={() => setActiveTab('History')} className="text-[10px] text-[#8cd92b] font-bold uppercase tracking-wider">See all</button>
                       </div>
                       <div className="flex overflow-x-auto gap-3 no-scrollbar pb-2">
-                        {MUSIC_DIRECTORS.map((director) => (
-                          <button
-                            key={director.id}
-                            onClick={() => fetchDirectorSongs(director)}
-                            className="flex flex-col items-center gap-2 shrink-0 active:scale-95 transition-all"
-                          >
-                            <div className={`w-[72px] h-[72px] rounded-2xl bg-gradient-to-br ${director.color} flex items-center justify-center text-2xl shadow-lg border border-white/10`}>
-                              {director.emoji}
+                        {(listenHistory.length > 0 ? listenHistory : searchHistory).slice(0, 8).map((song, i) => (
+                          <div key={`jump-${i}`} onClick={() => playSong(song)} className="flex flex-col w-[110px] shrink-0 cursor-pointer group active:scale-95 transition-all">
+                            <div className="relative w-[110px] h-[110px] mb-2 rounded-2xl overflow-hidden shadow-lg">
+                              <img src={song.thumbnail} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                              {currentSong?.id === song.id && (
+                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center" style={{ background: `${dominantColor}66` }}>
+                                  {isPlaying ? <Pause size={24} fill="white" className="text-white drop-shadow" /> : <Play size={24} fill="white" className="text-white drop-shadow ml-1" />}
+                                </div>
+                              )}
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                             </div>
-                            <span className="text-white text-[10px] font-bold text-center leading-tight w-[72px]">{director.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* 🕰️ Era Collections */}
-                    <div className="mb-6">
-                      <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-base font-bold text-white">🕰️ Time Travel</h2>
-                        <span className="text-[10px] text-[#8cd92b] font-semibold uppercase tracking-wider">Evergreen</span>
-                      </div>
-                      <div className="flex overflow-x-auto gap-3 no-scrollbar pb-2">
-                        {ERA_COLLECTIONS.map((era) => (
-                          <div
-                            key={era.id}
-                            onClick={() => fetchDirectorSongs(era)}
-                            className="flex-shrink-0 w-[140px] h-[72px] rounded-2xl relative overflow-hidden cursor-pointer active:scale-95 transition-all shadow-lg"
-                          >
-                            <div className={`absolute inset-0 bg-gradient-to-r ${era.color} opacity-80`} />
-                            <div className="absolute inset-0 bg-black/20" />
-                            <div className="absolute inset-0 flex items-center justify-between px-4">
-                              <div>
-                                <h3 className="text-white font-black text-sm italic">{era.name}</h3>
-                                <p className="text-white/80 text-[10px] font-bold">{era.subtitle}</p>
-                              </div>
-                              <span className="text-2xl drop-shadow-md">{era.emoji}</span>
-                            </div>
+                            <span className="text-white text-[11px] font-semibold truncate leading-tight">{cleanTitle(song.title)}</span>
+                            <span className="text-white/40 text-[10px] truncate mt-0.5">{song.artist?.replace(/ - Topic| VEVO/gi, '')}</span>
                           </div>
                         ))}
                       </div>
                     </div>
+                  )}
 
-                    {/* Jump Back In */}
-                    {(searchHistory.length > 0 || listenHistory.length > 0) && (
+                  {/* Suggested For You — based on listen history mood */}
+                  {listenHistory.length >= 3 && trendingSongs.length > 0 && (() => {
+                    // Pick mood from most recent song listened
+                    const recentTitle = (listenHistory[0]?.title || '').toLowerCase();
+                    const isLove = /love|kadhal|romantic|melody|vaseegara|nenjukkul|hosanna|un perai/.test(recentTitle);
+                    const isKuthu = /kuthu|mass|dance|rowdy|vaathi|verithanam|appadi/.test(recentTitle);
+                    const suggestedLabel = isLove ? '❤️ More Love Songs' : isKuthu ? '🔥 More Kuthu Bangers' : '🎵 Suggested For You';
+                    // Filter trending that don't overlap with listenHistory
+                    const playedIds = new Set(listenHistory.map(s => s.id));
+                    const suggested = trendingSongs.filter(s => !playedIds.has(s.id)).slice(0, 10);
+                    if (suggested.length < 3) return null;
+                    return (
                       <div className="mb-6">
                         <div className="flex items-center justify-between mb-3">
-                          <h2 className="text-base font-bold text-white">Jump Back In</h2>
-                          <button onClick={() => setActiveTab('History')} className="text-[10px] text-[#8cd92b] font-bold uppercase tracking-wider">See all</button>
+                          <h2 className="text-base font-bold text-white">{suggestedLabel}</h2>
+                          <span className="text-[10px] text-white/30 font-semibold">Tamil Only</span>
                         </div>
                         <div className="flex overflow-x-auto gap-3 no-scrollbar pb-2">
-                          {(listenHistory.length > 0 ? listenHistory : searchHistory).slice(0, 8).map((song, i) => (
-                            <div key={`jump-${i}`} onClick={() => playSong(song)} className="flex flex-col w-[110px] shrink-0 cursor-pointer group active:scale-95 transition-all">
-                              <div className="relative w-[110px] h-[110px] mb-2 rounded-2xl overflow-hidden shadow-lg">
+                          {suggested.map((song, i) => (
+                            <div key={`sug-${i}`} onClick={() => playSong(song)} className="flex flex-col w-[130px] shrink-0 cursor-pointer group active:scale-95 transition-all">
+                              <div className="relative w-[130px] h-[130px] mb-2 rounded-2xl overflow-hidden shadow-lg">
                                 <img src={song.thumbnail} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                {currentSong?.id === song.id && (
-                                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center" style={{ background: `${dominantColor}66` }}>
-                                    {isPlaying ? <Pause size={24} fill="white" className="text-white drop-shadow" /> : <Play size={24} fill="white" className="text-white drop-shadow ml-1" />}
+                                {currentSong?.id === song.id && isPlaying && (
+                                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                    <div className="flex gap-[2px] items-end h-5">
+                                      {[0, 1, 2].map(b => <div key={b} className="w-1 rounded-full animate-bounce" style={{ height: `${8 + b * 4}px`, backgroundColor: dominantColor, animationDelay: `${b * 0.1}s` }} />)}
+                                    </div>
                                   </div>
                                 )}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
                               </div>
                               <span className="text-white text-[11px] font-semibold truncate leading-tight">{cleanTitle(song.title)}</span>
                               <span className="text-white/40 text-[10px] truncate mt-0.5">{song.artist?.replace(/ - Topic| VEVO/gi, '')}</span>
@@ -1637,512 +1729,475 @@ export default function App() {
                           ))}
                         </div>
                       </div>
-                    )}
-
-                    {/* Suggested For You — based on listen history mood */}
-                    {listenHistory.length >= 3 && trendingSongs.length > 0 && (() => {
-                      // Pick mood from most recent song listened
-                      const recentTitle = (listenHistory[0]?.title || '').toLowerCase();
-                      const isLove = /love|kadhal|romantic|melody|vaseegara|nenjukkul|hosanna|un perai/.test(recentTitle);
-                      const isKuthu = /kuthu|mass|dance|rowdy|vaathi|verithanam|appadi/.test(recentTitle);
-                      const suggestedLabel = isLove ? '❤️ More Love Songs' : isKuthu ? '🔥 More Kuthu Bangers' : '🎵 Suggested For You';
-                      // Filter trending that don't overlap with listenHistory
-                      const playedIds = new Set(listenHistory.map(s => s.id));
-                      const suggested = trendingSongs.filter(s => !playedIds.has(s.id)).slice(0, 10);
-                      if (suggested.length < 3) return null;
-                      return (
-                        <div className="mb-6">
-                          <div className="flex items-center justify-between mb-3">
-                            <h2 className="text-base font-bold text-white">{suggestedLabel}</h2>
-                            <span className="text-[10px] text-white/30 font-semibold">Tamil Only</span>
-                          </div>
-                          <div className="flex overflow-x-auto gap-3 no-scrollbar pb-2">
-                            {suggested.map((song, i) => (
-                              <div key={`sug-${i}`} onClick={() => playSong(song)} className="flex flex-col w-[130px] shrink-0 cursor-pointer group active:scale-95 transition-all">
-                                <div className="relative w-[130px] h-[130px] mb-2 rounded-2xl overflow-hidden shadow-lg">
-                                  <img src={song.thumbnail} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                  {currentSong?.id === song.id && isPlaying && (
-                                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                      <div className="flex gap-[2px] items-end h-5">
-                                        {[0, 1, 2].map(b => <div key={b} className="w-1 rounded-full animate-bounce" style={{ height: `${8 + b * 4}px`, backgroundColor: dominantColor, animationDelay: `${b * 0.1}s` }} />)}
-                                      </div>
-                                    </div>
-                                  )}
-                                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-                                </div>
-                                <span className="text-white text-[11px] font-semibold truncate leading-tight">{cleanTitle(song.title)}</span>
-                                <span className="text-white/40 text-[10px] truncate mt-0.5">{song.artist?.replace(/ - Topic| VEVO/gi, '')}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
+                    );
+                  })()}
 
 
-                    {/* Trending Now */}
-                    {trendingSongs.length > 0 && (
-                      <div className="mb-6">
-                        <div className="flex items-center justify-between mb-3">
-                          <h2 className="text-base font-bold text-white">🔥 Trending Now</h2>
-                          <span className="text-[10px] text-white/30 font-semibold">Tamil Hits</span>
-                        </div>
-                        <div className="flex overflow-x-auto gap-3 no-scrollbar pb-2">
-                          {trendingSongs.slice(0, 10).map((song, i) => (
-                            <div key={`trend-${i}`} onClick={() => playSong(song)} className="flex flex-col w-[130px] shrink-0 cursor-pointer group active:scale-95 transition-all">
-                              <div className="relative w-[130px] h-[130px] mb-2 rounded-2xl overflow-hidden shadow-lg">
-                                <img src={song.thumbnail} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm text-white text-[10px] font-black px-2 py-0.5 rounded-full">#{i + 1}</div>
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-                              </div>
-                              <span className="text-white text-[11px] font-semibold truncate leading-tight">{song.title}</span>
-                              <span className="text-white/40 text-[10px] truncate mt-0.5">{song.artist}</span>
-                            </div>
-                          ))}
-                        </div>
+                  {/* Trending Now */}
+                  {trendingSongs.length > 0 && (
+                    <div className="mb-6">
+                      <div className="flex items-center justify-between mb-3">
+                        <h2 className="text-base font-bold text-white">🔥 Trending Now</h2>
+                        <span className="text-[10px] text-white/30 font-semibold">Tamil Hits</span>
                       </div>
-                    )}
-
-                    {/* Your Playlists */}
-                    {playlists.length > 0 && (
-                      <div className="mb-6">
-                        <div className="flex items-center justify-between mb-3">
-                          <h2 className="text-base font-bold text-white">Your Playlists</h2>
-                          <button onClick={() => setActiveTab('Playlists')} className="text-[10px] text-[#8cd92b] font-bold uppercase tracking-wider">See all</button>
-                        </div>
-                        <div className="flex overflow-x-auto gap-3 no-scrollbar pb-2">
-                          {playlists.map((pl, i) => (
-                            <div key={pl.id} onClick={() => { setCurrentViewPlaylist(pl); setActiveTab('PlaylistDetails'); }} className="flex flex-col w-[110px] shrink-0 cursor-pointer active:scale-95 transition-all">
-                              <div className="w-[110px] h-[110px] mb-2 rounded-2xl overflow-hidden shadow-lg bg-[#2a2a2a] flex items-center justify-center relative">
-                                {pl.songs.length > 0 ? (
-                                  <div className="grid grid-cols-2 w-full h-full">
-                                    {pl.songs.slice(0, 4).map((s, si) => <img key={si} src={s.thumbnail} alt="" className="w-full h-full object-cover" />)}
-                                  </div>
-                                ) : (
-                                  <div className={`w-full h-full bg-gradient-to-br ${['from-purple-600 to-blue-500', 'from-green-600 to-teal-500', 'from-orange-600 to-pink-500', 'from-red-600 to-yellow-500'][i % 4]} flex items-center justify-center`}>
-                                    <List size={32} className="text-white/80" />
-                                  </div>
-                                )}
-                              </div>
-                              <span className="text-white text-[11px] font-semibold truncate">{pl.name}</span>
-                              <span className="text-white/40 text-[10px] mt-0.5">{pl.songs.length} songs</span>
+                      <div className="flex overflow-x-auto gap-3 no-scrollbar pb-2">
+                        {trendingSongs.slice(0, 10).map((song, i) => (
+                          <div key={`trend-${i}`} onClick={() => playSong(song)} className="flex flex-col w-[130px] shrink-0 cursor-pointer group active:scale-95 transition-all">
+                            <div className="relative w-[130px] h-[130px] mb-2 rounded-2xl overflow-hidden shadow-lg">
+                              <img src={song.thumbnail} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                              <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm text-white text-[10px] font-black px-2 py-0.5 rounded-full">#{i + 1}</div>
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Suggestions for you (fallback songs) */}
-                    <div className="mb-24">
-                      <h2 className="text-base font-bold text-white mb-3">Suggested for You</h2>
-                      <div className="space-y-1">
-                        {fallbackSongs.slice(0, 10).map((song, i) => (
-                          <div key={`sugg-${song.id}`} onClick={() => playSong(song)} className="flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all active:scale-[0.98] active:bg-white/5 group">
-                            <div className="relative shrink-0">
-                              <img src={song.thumbnail} alt="" className="w-12 h-12 object-cover rounded-xl shadow-sm" />
-                              {currentSong?.id === song.id && isPlaying && (
-                                <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
-                                  <div className="flex gap-0.5 items-end h-4">
-                                    {[0, 1, 2].map(b => <div key={b} className="w-[3px] rounded-full animate-bounce" style={{ height: `${6 + b * 3}px`, backgroundColor: dominantColor, animationDelay: `${b * 0.1}s` }} />)}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex-1 overflow-hidden">
-                              <h4 className="text-white text-[13px] font-semibold truncate">{song.title}</h4>
-                              <p className="text-white/40 text-[11px] truncate mt-0.5">{song.artist}</p>
-                            </div>
-                            <button onClick={(e) => { e.stopPropagation(); toggleFavorite(e, song); }} className="p-2 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity active:opacity-100">
-                              <Heart size={16} fill={favoriteIds.has(song.id) ? dominantColor : 'none'} stroke={favoriteIds.has(song.id) ? dominantColor : 'currentColor'} className="text-white/40" />
-                            </button>
+                            <span className="text-white text-[11px] font-semibold truncate leading-tight">{song.title}</span>
+                            <span className="text-white/40 text-[10px] truncate mt-0.5">{song.artist}</span>
                           </div>
                         ))}
                       </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })()}
+                  )}
 
-            {/* FAVORITES VIEW */}
-            {activeTab === 'Favorites' && (
-              <div className="overflow-x-hidden min-h-screen bg-[#121212] animate-fade-in animate-slide-up-premium">
-                <div className="px-5 pt-12 pb-6 flex flex-col justify-end" style={{ background: `linear-gradient(to bottom, ${dominantColor}dd 0%, #121212 100%)` }}>
-                  <div onClick={() => setActiveTab('Home')} className="mb-6 bg-black/20 w-11 h-11 rounded-full flex items-center justify-center cursor-pointer hover:bg-black/40 active:scale-95 transition-all">
-                    <ArrowLeft size={20} className="text-white" />
-                  </div>
-                  <h1 className="text-3xl font-bold text-white tracking-widest leading-tight">Liked Songs</h1>
-                  <p className="text-sm text-[#d1c4e9] mt-2 font-medium">{favorites.length} songs</p>
-                </div>
-                <div className="px-4 pb-24 space-y-1">
-                  {favorites.length > 0 ? favorites.map((song, idx) => (
-                    <DesktopSongRow key={song.id} song={song} onSelect={() => playSong(song)} isFavorite={true} onToggleFavorite={(e) => toggleFavorite(e, song)} />
-                  )) : (
-                    <div className="flex flex-col items-center justify-center pt-16 pb-8 text-center px-6">
-                      <div className="relative mb-6">
-                        <div className="w-28 h-28 rounded-full flex items-center justify-center" style={{ background: `${dominantColor}22`, border: `2px solid ${dominantColor}44` }}>
-                          <Heart size={44} className="text-[#a080ff]" />
-                        </div>
-                        <div className="absolute -top-1 -right-1 text-2xl animate-bounce">🎵</div>
-                        <div className="absolute -bottom-1 -left-2 text-xl animate-bounce" style={{ animationDelay: '0.2s' }}>🎶</div>
+                  {/* Your Playlists */}
+                  {playlists.length > 0 && (
+                    <div className="mb-6">
+                      <div className="flex items-center justify-between mb-3">
+                        <h2 className="text-base font-bold text-white">Your Playlists</h2>
+                        <button onClick={() => setActiveTab('Playlists')} className="text-[10px] text-[#8cd92b] font-bold uppercase tracking-wider">See all</button>
                       </div>
-                      <h3 className="text-white font-bold text-lg mb-2">No liked songs yet</h3>
-                      <p className="text-white/40 text-sm leading-relaxed mb-6">Tap the ♥ heart on any song while it's playing to save it here</p>
-                      <button
-                        onClick={() => setActiveTab('Search')}
-                        className="px-6 py-3 rounded-full font-bold text-sm text-black"
-                        style={{ background: dominantColor }}
-                      >
-                        🔍 Discover Songs
-                      </button>
+                      <div className="flex overflow-x-auto gap-3 no-scrollbar pb-2">
+                        {playlists.map((pl, i) => (
+                          <div key={pl.id} onClick={() => { setCurrentViewPlaylist(pl); setActiveTab('PlaylistDetails'); }} className="flex flex-col w-[110px] shrink-0 cursor-pointer active:scale-95 transition-all">
+                            <div className="w-[110px] h-[110px] mb-2 rounded-2xl overflow-hidden shadow-lg bg-[#2a2a2a] flex items-center justify-center relative">
+                              {pl.songs.length > 0 ? (
+                                <div className="grid grid-cols-2 w-full h-full">
+                                  {pl.songs.slice(0, 4).map((s, si) => <img key={si} src={s.thumbnail} alt="" className="w-full h-full object-cover" />)}
+                                </div>
+                              ) : (
+                                <div className={`w-full h-full bg-gradient-to-br ${['from-purple-600 to-blue-500', 'from-green-600 to-teal-500', 'from-orange-600 to-pink-500', 'from-red-600 to-yellow-500'][i % 4]} flex items-center justify-center`}>
+                                  <List size={32} className="text-white/80" />
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-white text-[11px] font-semibold truncate">{pl.name}</span>
+                            <span className="text-white/40 text-[10px] mt-0.5">{pl.songs.length} songs</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
-                </div>
-              </div>
-            )}
 
-            {/* LISTEN HISTORY VIEW */}
-            {activeTab === 'History' && (
-              <div className="overflow-x-hidden min-h-screen bg-[#121212] animate-fade-in animate-slide-up-premium">
-                <div className="px-5 pt-12 pb-6" style={{ background: `linear-gradient(to bottom, ${dominantColor}55 0%, #121212 100%)` }}>
-                  <button onClick={() => setActiveTab('Home')} className="mb-4 w-11 h-11 bg-black/20 rounded-full flex items-center justify-center hover:bg-black/30 active:scale-95 transition-all">
-                    <ArrowLeft size={18} className="text-white" />
-                  </button>
-                  <h1 className="text-3xl font-bold text-white">Recently Played</h1>
-                  <p className="text-sm text-white/50 mt-1 font-medium">{listenHistory.length} songs</p>
-                </div>
-                <div className="px-4 pb-24 space-y-1">
-                  {listenHistory.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center pt-20 text-center opacity-40">
-                      <History size={48} className="mb-4 text-gray-500" />
-                      <p className="text-white font-bold">No history yet</p>
-                      <p className="text-gray-500 text-sm mt-1">Play a song to see it here</p>
-                    </div>
-                  ) : (
-                    listenHistory.map((song, idx) => (
-                      <div key={`${song.id}-${idx}`} onClick={() => playSong(song)} className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-xl cursor-pointer transition-all active:scale-[0.98]">
-                        <div className="relative shrink-0">
-                          <img src={song.thumbnail} alt="" className="w-12 h-12 object-cover rounded-xl shadow-sm" />
-                          {currentSong?.id === song.id && isPlaying && (
-                            <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
-                              <div className="flex gap-0.5 items-end h-4">
-                                {[0, 1, 2].map(b => <div key={b} className="w-[3px] rounded-full animate-bounce" style={{ height: `${6 + b * 4}px`, backgroundColor: dominantColor, animationDelay: `${b * 0.1}s` }} />)}
+                  {/* Suggestions for you (fallback songs) */}
+                  <div className="mb-24">
+                    <h2 className="text-base font-bold text-white mb-3">Suggested for You</h2>
+                    <div className="space-y-1">
+                      {fallbackSongs.slice(0, 10).map((song, i) => (
+                        <div key={`sugg-${song.id}`} onClick={() => playSong(song)} className="flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all active:scale-[0.98] active:bg-white/5 group">
+                          <div className="relative shrink-0">
+                            <img src={song.thumbnail} alt="" className="w-12 h-12 object-cover rounded-xl shadow-sm" />
+                            {currentSong?.id === song.id && isPlaying && (
+                              <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
+                                <div className="flex gap-0.5 items-end h-4">
+                                  {[0, 1, 2].map(b => <div key={b} className="w-[3px] rounded-full animate-bounce" style={{ height: `${6 + b * 3}px`, backgroundColor: dominantColor, animationDelay: `${b * 0.1}s` }} />)}
+                                </div>
                               </div>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 overflow-hidden">
-                          <h4 className="font-semibold text-white text-[14px] truncate">{song.title}</h4>
-                          <p className="text-[12px] text-[#a0a0a0] truncate mt-0.5">{song.artist}</p>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <p className="text-[10px] text-gray-600">
-                            {song.playedAt ? new Date(song.playedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                          </p>
-                          <button onClick={(e) => { e.stopPropagation(); toggleFavorite(e, song); }} className="p-1.5">
-                            <Heart size={14} fill={favoriteIds.has(song.id) ? dominantColor : 'none'} stroke={favoriteIds.has(song.id) ? dominantColor : '#6b7280'} />
+                            )}
+                          </div>
+                          <div className="flex-1 overflow-hidden">
+                            <h4 className="text-white text-[13px] font-semibold truncate">{song.title}</h4>
+                            <p className="text-white/40 text-[11px] truncate mt-0.5">{song.artist}</p>
+                          </div>
+                          <button onClick={(e) => { e.stopPropagation(); setShowSongOptions(song); }} className="p-2 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity active:opacity-100">
+                            <MoreVertical size={16} className="text-white/40" />
                           </button>
                         </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* DIRECTOR SONGS VIEW */}
-            {activeTab === 'DirectorSongs' && selectedDirector && (
-              <div className="overflow-x-hidden min-h-screen bg-[#121212] animate-fade-in animate-slide-up-premium">
-                {/* Hero Header */}
-                <div className={`relative px-5 pt-12 pb-8 overflow-hidden`} style={{ background: `linear-gradient(160deg, ${dominantColor}55 0%, #121212 100%)` }}>
-                  <div className={`absolute inset-0 bg-gradient-to-br ${selectedDirector.color} opacity-20`} />
-                  <button onClick={() => setActiveTab('Home')} className="relative z-10 mb-5 w-11 h-11 bg-black/20 rounded-full flex items-center justify-center hover:bg-black/40 active:scale-95 transition-all">
-                    <ArrowLeft size={18} className="text-white" />
-                  </button>
-                  <div className="relative z-10 flex items-center gap-4">
-                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${selectedDirector.color} flex items-center justify-center text-3xl shadow-2xl`}>
-                      {selectedDirector.emoji}
-                    </div>
-                    <div>
-                      <p className="text-white/50 text-[10px] uppercase tracking-widest font-bold mb-1">✨ {selectedDirector.subtitle || 'Collection'}</p>
-                      <h1 className="text-2xl font-black text-white">{selectedDirector.name}</h1>
-                      <p className="text-white/40 text-xs mt-0.5">{directorSongs.length > 0 ? `${directorSongs.length} songs` : 'Loading...'}</p>
+                      ))}
                     </div>
                   </div>
                 </div>
+              </div>
+            );
+          })()}
 
-                {/* Song List */}
-                <div className="px-4 pb-24 space-y-1 mt-2">
-                  {directorLoading ? (
-                    [...Array(8)].map((_, i) => (
-                      <div key={i} className="flex items-center gap-3 p-2 animate-pulse">
-                        <div className="w-12 h-12 rounded-xl bg-white/10 shrink-0" />
-                        <div className="flex-1">
-                          <div className="h-3 bg-white/10 rounded-full w-3/4 mb-2" />
-                          <div className="h-2.5 bg-white/10 rounded-full w-1/2" />
-                        </div>
+          {/* FAVORITES VIEW */}
+          {activeTab === 'Favorites' && (
+            <div className="overflow-x-hidden min-h-screen bg-[#121212] animate-fade-in animate-slide-up-premium">
+              <div className="px-5 pt-12 pb-6 flex flex-col justify-end" style={{ background: `linear-gradient(to bottom, ${dominantColor}dd 0%, #121212 100%)` }}>
+                <div onClick={() => setActiveTab('Home')} className="mb-6 bg-black/20 w-11 h-11 rounded-full flex items-center justify-center cursor-pointer hover:bg-black/40 active:scale-95 transition-all">
+                  <ArrowLeft size={20} className="text-white" />
+                </div>
+                <h1 className="text-3xl font-bold text-white tracking-widest leading-tight">Liked Songs</h1>
+                <p className="text-sm text-[#d1c4e9] mt-2 font-medium">{favorites.length} songs</p>
+              </div>
+              <div className="px-4 pb-24 space-y-1">
+                {favorites.length > 0 ? favorites.map((song, idx) => (
+                  <DesktopSongRow key={song.id} song={song} onSelect={() => playSong(song)} isFavorite={true} onToggleFavorite={(e) => toggleFavorite(e, song)} />
+                )) : (
+                  <div className="flex flex-col items-center justify-center pt-16 pb-8 text-center px-6">
+                    <div className="relative mb-6">
+                      <div className="w-28 h-28 rounded-full flex items-center justify-center" style={{ background: `${dominantColor}22`, border: `2px solid ${dominantColor}44` }}>
+                        <Heart size={44} className="text-[#8cd92b]" />
                       </div>
-                    ))
-                  ) : directorSongs.length === 0 ? (
-                    <div className="text-center py-20 opacity-40">
-                      <p className="text-white font-bold text-lg">{selectedDirector.emoji}</p>
-                      <p className="text-white/60 text-sm mt-2">No songs found</p>
+                      <div className="absolute -top-1 -right-1 text-2xl animate-bounce">🎵</div>
+                      <div className="absolute -bottom-1 -left-2 text-xl animate-bounce" style={{ animationDelay: '0.2s' }}>🎶</div>
                     </div>
-                  ) : (
-                    directorSongs.map((song, idx) => (
-                      <div key={`dir-${song.id}-${idx}`} onClick={() => playSong(song)} className="flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all active:scale-[0.98] active:bg-white/5 group">
-                        <div className="relative shrink-0">
-                          <img src={song.thumbnail} alt="" className="w-12 h-12 object-cover rounded-xl shadow-sm" />
-                          {currentSong?.id === song.id && isPlaying && (
-                            <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
-                              <div className="flex gap-0.5 items-end h-4">
-                                {[0, 1, 2].map(b => <div key={b} className="w-[3px] rounded-full animate-bounce" style={{ height: `${6 + b * 3}px`, backgroundColor: dominantColor, animationDelay: `${b * 0.1}s` }} />)}
-                              </div>
+                    <h3 className="text-white font-bold text-lg mb-2">No liked songs yet</h3>
+                    <p className="text-white/40 text-sm leading-relaxed mb-6">Tap the ♥ heart on any song while it's playing to save it here</p>
+                    <button
+                      onClick={() => setActiveTab('Search')}
+                      className="px-6 py-3 rounded-full font-bold text-sm text-black"
+                      style={{ background: dominantColor }}
+                    >
+                      🔍 Discover Songs
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* LISTEN HISTORY VIEW */}
+          {activeTab === 'History' && (
+            <div className="overflow-x-hidden min-h-screen bg-[#121212] animate-fade-in animate-slide-up-premium">
+              <div className="px-5 pt-12 pb-6" style={{ background: `linear-gradient(to bottom, ${dominantColor}55 0%, #121212 100%)` }}>
+                <button onClick={() => setActiveTab('Home')} className="mb-4 w-11 h-11 bg-black/20 rounded-full flex items-center justify-center hover:bg-black/30 active:scale-95 transition-all">
+                  <ArrowLeft size={18} className="text-white" />
+                </button>
+                <h1 className="text-3xl font-bold text-white">Recently Played</h1>
+                <p className="text-sm text-white/50 mt-1 font-medium">{listenHistory.length} songs</p>
+              </div>
+              <div className="px-4 pb-24 space-y-1">
+                {listenHistory.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center pt-20 text-center opacity-40">
+                    <History size={48} className="mb-4 text-gray-500" />
+                    <p className="text-white font-bold">No history yet</p>
+                    <p className="text-gray-500 text-sm mt-1">Play a song to see it here</p>
+                  </div>
+                ) : (
+                  listenHistory.map((song, idx) => (
+                    <div key={`${song.id}-${idx}`} onClick={() => playSong(song)} className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-xl cursor-pointer transition-all active:scale-[0.98]">
+                      <div className="relative shrink-0">
+                        <img src={song.thumbnail} alt="" className="w-12 h-12 object-cover rounded-xl shadow-sm" />
+                        {currentSong?.id === song.id && isPlaying && (
+                          <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
+                            <div className="flex gap-0.5 items-end h-4">
+                              {[0, 1, 2].map(b => <div key={b} className="w-[3px] rounded-full animate-bounce" style={{ height: `${6 + b * 4}px`, backgroundColor: dominantColor, animationDelay: `${b * 0.1}s` }} />)}
                             </div>
-                          )}
-                          <div className="absolute top-1 left-1 bg-black/60 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
-                            {idx + 1}
                           </div>
-                        </div>
-                        <div className="flex-1 overflow-hidden">
-                          <h4 className="text-white text-[13px] font-semibold truncate">{song.title}</h4>
-                          <p className="text-white/40 text-[11px] truncate mt-0.5">{song.artist}</p>
-                        </div>
-                        <button onClick={(e) => { e.stopPropagation(); toggleFavorite(e, song); }} className="p-2 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity active:opacity-100">
-                          <Heart size={16} fill={favoriteIds.has(song.id) ? dominantColor : 'none'} stroke={favoriteIds.has(song.id) ? dominantColor : '#6b7280'} />
+                        )}
+                      </div>
+                      <div className="flex-1 overflow-hidden">
+                        <h4 className="font-semibold text-white text-[14px] truncate">{song.title}</h4>
+                        <p className="text-[12px] text-[#a0a0a0] truncate mt-0.5">{song.artist}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <p className="text-[10px] text-gray-600">
+                          {song.playedAt ? new Date(song.playedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                        </p>
+                        <button onClick={(e) => { e.stopPropagation(); setShowSongOptions(song); }} className="p-1.5">
+                          <MoreVertical size={14} className="text-gray-500" />
                         </button>
                       </div>
-                    ))
-                  )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* DIRECTOR SONGS VIEW */}
+          {activeTab === 'DirectorSongs' && selectedDirector && (
+            <div className="overflow-x-hidden min-h-screen bg-[#121212] animate-fade-in animate-slide-up-premium">
+              {/* Hero Header */}
+              <div className={`relative px-5 pt-12 pb-8 overflow-hidden`} style={{ background: `linear-gradient(160deg, ${dominantColor}55 0%, #121212 100%)` }}>
+                <div className={`absolute inset-0 bg-gradient-to-br ${selectedDirector.color} opacity-20`} />
+                <button onClick={() => setActiveTab('Home')} className="relative z-10 mb-5 w-11 h-11 bg-black/20 rounded-full flex items-center justify-center hover:bg-black/40 active:scale-95 transition-all">
+                  <ArrowLeft size={18} className="text-white" />
+                </button>
+                <div className="relative z-10 flex items-center gap-4">
+                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${selectedDirector.color} flex items-center justify-center text-3xl shadow-2xl`}>
+                    {selectedDirector.emoji}
+                  </div>
+                  <div>
+                    <p className="text-white/50 text-[10px] uppercase tracking-widest font-bold mb-1">✨ {selectedDirector.subtitle || 'Collection'}</p>
+                    <h1 className="text-2xl font-black text-white">{selectedDirector.name}</h1>
+                    <p className="text-white/40 text-xs mt-0.5">{directorSongs.length > 0 ? `${directorSongs.length} songs` : 'Loading...'}</p>
+                  </div>
                 </div>
               </div>
-            )}
 
-            {/* SEARCH VIEW */}
-            {activeTab === 'Search' && (
-              <div className="p-4 pt-10 flex flex-col h-full bg-[#121212] animate-fade-in animate-slide-up-premium">
-                <h1 className="text-2xl font-bold text-white mb-4">Search</h1>
-                <form onSubmit={searchYoutube} className="mb-4 shrink-0">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Songs, artists, moods..."
-                      className="w-full bg-white text-black px-4 py-[12px] pl-10 pr-12 rounded-xl outline-none font-semibold text-base shadow-lg"
-                    />
-                    <Search className="absolute left-3 top-3.5 text-[#121212]" size={18} />
-                    {searchQuery && (
-                      <button type="button" onClick={() => { setSearchQuery(''); setSongs([]); }} className="absolute right-3 top-3.5 text-gray-400 p-0.5">
-                        <X size={18} />
-                      </button>
-                    )}
+              {/* Song List */}
+              <div className="px-4 pb-24 space-y-1 mt-2">
+                {directorLoading ? (
+                  [...Array(8)].map((_, i) => (
+                    <div key={i} className="flex items-center gap-3 p-2 animate-pulse">
+                      <div className="w-12 h-12 rounded-xl bg-white/10 shrink-0" />
+                      <div className="flex-1">
+                        <div className="h-3 bg-white/10 rounded-full w-3/4 mb-2" />
+                        <div className="h-2.5 bg-white/10 rounded-full w-1/2" />
+                      </div>
+                    </div>
+                  ))
+                ) : directorSongs.length === 0 ? (
+                  <div className="text-center py-20 opacity-40">
+                    <p className="text-white font-bold text-lg">{selectedDirector.emoji}</p>
+                    <p className="text-white/60 text-sm mt-2">No songs found</p>
                   </div>
-                </form>
+                ) : (
+                  directorSongs.map((song, idx) => (
+                    <div key={`dir-${song.id}-${idx}`} onClick={() => playSong(song)} className="flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all active:scale-[0.98] active:bg-white/5 group">
+                      <div className="relative shrink-0">
+                        <img src={song.thumbnail} alt="" className="w-12 h-12 object-cover rounded-xl shadow-sm" />
+                        {currentSong?.id === song.id && isPlaying && (
+                          <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
+                            <div className="flex gap-0.5 items-end h-4">
+                              {[0, 1, 2].map(b => <div key={b} className="w-[3px] rounded-full animate-bounce" style={{ height: `${6 + b * 3}px`, backgroundColor: dominantColor, animationDelay: `${b * 0.1}s` }} />)}
+                            </div>
+                          </div>
+                        )}
+                        <div className="absolute top-1 left-1 bg-black/60 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
+                          {idx + 1}
+                        </div>
+                      </div>
+                      <div className="flex-1 overflow-hidden">
+                        <h4 className="text-white text-[13px] font-semibold truncate">{song.title}</h4>
+                        <p className="text-white/40 text-[11px] truncate mt-0.5">{song.artist}</p>
+                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); setShowSongOptions(song); }} className="p-2 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity active:opacity-100">
+                        <MoreVertical size={16} className="text-white/40" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
 
-                {/* Quick Genre Chips */}
-                {songs.length === 0 && !loading && (
-                  <div className="mb-4 shrink-0">
-                    <p className="text-xs text-white/40 font-bold uppercase tracking-wider mb-2">Browse by mood</p>
-                    <div className="flex overflow-x-auto gap-2 no-scrollbar pb-1">
-                      {GENRE_CHIPS.map((chip) => (
-                        <button
-                          key={chip.label}
-                          onClick={() => { setSearchQuery(chip.label); searchYoutube(null, chip.query); }}
-                          className="shrink-0 px-4 py-2 rounded-full text-sm font-bold bg-[#1a1c2a] text-white border border-[#3e3e3e]/60 hover:border-[#8cd92b]/60 hover:text-[#8cd92b] active:scale-95 transition-all whitespace-nowrap"
+          {/* SEARCH VIEW */}
+          {activeTab === 'Search' && (
+            <div className="p-4 pt-10 flex flex-col h-full bg-[#121212] animate-fade-in animate-slide-up-premium">
+              <h1 className="text-2xl font-bold text-white mb-4">Search</h1>
+              <form onSubmit={searchYoutube} className="mb-4 shrink-0">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Songs, artists, moods..."
+                    className="w-full bg-white text-black px-4 py-[12px] pl-10 pr-12 rounded-xl outline-none font-semibold text-base shadow-lg"
+                  />
+                  <Search className="absolute left-3 top-3.5 text-[#121212]" size={18} />
+                  {searchQuery && (
+                    <button type="button" onClick={() => { setSearchQuery(''); setSongs([]); }} className="absolute right-3 top-3.5 text-gray-400 p-0.5">
+                      <X size={18} />
+                    </button>
+                  )}
+                </div>
+              </form>
+
+              {/* Quick Genre Chips */}
+              {songs.length === 0 && !loading && (
+                <div className="mb-4 shrink-0">
+                  <p className="text-xs text-white/40 font-bold uppercase tracking-wider mb-2">Browse by mood</p>
+                  <div className="flex overflow-x-auto gap-2 no-scrollbar pb-1">
+                    {GENRE_CHIPS.map((chip) => (
+                      <button
+                        key={chip.label}
+                        onClick={() => { setSearchQuery(chip.label); searchYoutube(null, chip.query); }}
+                        className="shrink-0 px-4 py-2 rounded-full text-sm font-bold bg-[#1a1c2a] text-white border border-[#3e3e3e]/60 hover:border-[#8cd92b]/60 hover:text-[#8cd92b] active:scale-95 transition-all whitespace-nowrap"
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex-1 overflow-y-auto no-scrollbar pb-24 overscroll-contain">
+                {songs.length === 0 && searchHistory.length > 0 && (
+                  <div className="mb-6 mt-2 px-1 animate-fade-in">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider">Recent</h3>
+                      <button
+                        onClick={() => { setSearchHistory([]); localStorage.removeItem('musicHistory'); }}
+                        className="text-[10px] uppercase font-bold text-[#8cd92b] hover:opacity-70 transition-opacity"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                    <div className="space-y-1">
+                      {searchHistory.slice(0, 5).map((item, i) => (
+                        <div
+                          key={i}
+                          onClick={() => { setSearchQuery(item.title || item); searchYoutube(null, item.title || item); }}
+                          className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 cursor-pointer transition-all active:scale-[0.98]"
                         >
-                          {chip.label}
-                        </button>
+                          <div className="w-9 h-9 bg-[#2a2a2a] rounded-lg flex items-center justify-center shrink-0">
+                            <Clock size={14} className="text-gray-500" />
+                          </div>
+                          <span className="text-white text-sm font-medium truncate">{typeof item === 'string' ? item : item.title}</span>
+                        </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                <div className="flex-1 overflow-y-auto no-scrollbar pb-24 overscroll-contain">
-                  {songs.length === 0 && searchHistory.length > 0 && (
-                    <div className="mb-6 mt-2 px-1 animate-fade-in">
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider">Recent</h3>
-                        <button
-                          onClick={() => { setSearchHistory([]); localStorage.removeItem('musicHistory'); }}
-                          className="text-[10px] uppercase font-bold text-[#8cd92b] hover:opacity-70 transition-opacity"
-                        >
-                          Clear All
-                        </button>
-                      </div>
-                      <div className="space-y-1">
-                        {searchHistory.slice(0, 5).map((item, i) => (
-                          <div
-                            key={i}
-                            onClick={() => { setSearchQuery(item.title || item); searchYoutube(null, item.title || item); }}
-                            className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 cursor-pointer transition-all active:scale-[0.98]"
-                          >
-                            <div className="w-9 h-9 bg-[#2a2a2a] rounded-lg flex items-center justify-center shrink-0">
-                              <Clock size={14} className="text-gray-500" />
-                            </div>
-                            <span className="text-white text-sm font-medium truncate">{typeof item === 'string' ? item : item.title}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {loading ? (
-                    <div className="space-y-2 mt-4 px-1">
-                      {[...Array(6)].map((_, i) => <SkeletonRow key={i} />)}
-                    </div>
-                  ) : (
-                    <>
-                      {(songs.length > 0 || displaySongs.length > 0) && (
-                        <h3 className="text-xs font-bold text-white/40 mb-3 px-1 uppercase tracking-wider">
-                          {songs.length > 0 ? `${songs.length} results` : 'Suggestions for you'}
-                        </h3>
-                      )}
-                      <div className="space-y-1">
-                        {(songs.length > 0 ? songs : displaySongs).map((song) => (
-                          <div key={song.id} onClick={() => playSong(song)} className="flex items-center gap-3 p-2 hover:bg-[#ffffff0a] rounded-xl cursor-pointer transition-all active:scale-[0.98] active:opacity-80">
-                            <div className="relative shrink-0">
-                              <img src={song.thumbnail} alt="" className="w-12 h-12 object-cover rounded-xl shadow-sm" />
-                              {currentSong?.id === song.id && isPlaying && (
-                                <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
-                                  <div className="flex gap-[2px] items-end h-4">
-                                    {[0, 1, 2].map(b => <div key={b} className="w-[3px] rounded-full animate-bounce" style={{ height: `${7 + b * 3}px`, backgroundColor: dominantColor, animationDelay: `${b * 0.1}s` }} />)}
-                                  </div>
+                {loading ? (
+                  <div className="space-y-2 mt-4 px-1">
+                    {[...Array(6)].map((_, i) => <SkeletonRow key={i} />)}
+                  </div>
+                ) : (
+                  <>
+                    {(songs.length > 0 || fallbackSongs.length > 0) && (
+                      <h3 className="text-xs font-bold text-white/40 mb-3 px-1 uppercase tracking-wider">
+                        {songs.length > 0 ? `${songs.length} results` : 'Suggestions for you'}
+                      </h3>
+                    )}
+                    <div className="space-y-1">
+                      {(songs.length > 0 ? songs : fallbackSongs).map((song) => (
+                        <div key={song.id} onClick={() => playSong(song)} className="flex items-center gap-3 p-2 hover:bg-[#ffffff0a] rounded-xl cursor-pointer transition-all active:scale-[0.98] active:opacity-80">
+                          <div className="relative shrink-0">
+                            <img src={song.thumbnail} alt="" className="w-12 h-12 object-cover rounded-xl shadow-sm" />
+                            {currentSong?.id === song.id && isPlaying && (
+                              <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
+                                <div className="flex gap-[2px] items-end h-4">
+                                  {[0, 1, 2].map(b => <div key={b} className="w-[3px] rounded-full animate-bounce" style={{ height: `${7 + b * 3}px`, backgroundColor: dominantColor, animationDelay: `${b * 0.1}s` }} />)}
                                 </div>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 overflow-hidden">
+                            <h4 className="font-semibold text-white text-[13px] truncate leading-snug">{cleanTitle(song.title)}</h4>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <p className="text-[11px] text-[#a0a0a0] truncate">{song.artist?.replace(/ - Topic| VEVO/gi, '')}</p>
+                              {song.durationSeconds > 0 && (
+                                <span className="text-[10px] text-white/25 shrink-0 font-mono">{Math.floor(song.durationSeconds / 60)}:{String(song.durationSeconds % 60).padStart(2, '0')}</span>
                               )}
                             </div>
-                            <div className="flex-1 overflow-hidden">
-                              <h4 className="font-semibold text-white text-[13px] truncate leading-snug">{cleanTitle(song.title)}</h4>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <p className="text-[11px] text-[#a0a0a0] truncate">{song.artist?.replace(/ - Topic| VEVO/gi, '')}</p>
-                                {song.durationSeconds > 0 && (
-                                  <span className="text-[10px] text-white/25 shrink-0 font-mono">{Math.floor(song.durationSeconds / 60)}:{String(song.durationSeconds % 60).padStart(2, '0')}</span>
-                                )}
-                              </div>
-                            </div>
-                            <MoreHorizontal size={16} className="text-gray-600 shrink-0" />
                           </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* PLAYLISTS VIEW */}
-            {activeTab === 'Playlists' && (
-              <div className="p-6 pt-10">
-                <h1 className="text-2xl font-bold text-white mb-8">Your Playlists</h1>
-                <div className="space-y-3 pb-6">
-                  {playlists.map((pl) => (
-                    <div
-                      key={pl.id}
-                      onClick={() => {
-                        setCurrentViewPlaylist(pl);
-                        setActiveTab('PlaylistDetails');
-                      }}
-                      className="flex items-center gap-4 bg-[#1a1c2a] p-4 rounded-2xl cursor-pointer border border-[#262837]"
-                    >
-                      <div className="w-12 h-12 bg-[#262837] rounded-xl flex items-center justify-center text-[#8cd92b]">
-                        <List size={24} />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-white text-sm">{pl.name}</h4>
-                        <p className="text-xs text-gray-500">{pl.songs.length} songs</p>
-                      </div>
+                          <button onClick={(e) => { e.stopPropagation(); setShowSongOptions(song); }} className="p-2 text-gray-600 shrink-0">
+                            <MoreVertical size={16} />
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </>
+                )}
               </div>
-            )}
+            </div>
+          )}
 
-            {/* PLAYLIST DETAILS VIEW */}
-            {activeTab === 'PlaylistDetails' && currentViewPlaylist && (
-              <div className="p-6 pt-10 h-full">
-                <div className="flex items-center gap-4 mb-8">
-                  <button onClick={() => setActiveTab('Playlists')} className="w-10 h-10 flex items-center justify-center bg-[#1a1c2a] rounded-full text-white">
-                    <ArrowLeft size={18} />
-                  </button>
-                  <h2 className="text-xl font-bold text-white">{currentViewPlaylist.name}</h2>
-                </div>
-                <div className="space-y-3 pb-10">
-                  {currentViewPlaylist.songs.map((song, idx) => (
-                    <div key={idx} onClick={() => playSong(song)} className="flex items-center gap-3 bg-[#1a1c2a] p-3 rounded-2xl cursor-pointer border border-[#262837]">
-                      <img src={song.thumbnail} alt="" className="w-12 h-12 rounded-xl object-cover" />
-                      <div className="flex-1 overflow-hidden">
-                        <h4 className="font-semibold text-white text-sm truncate">{song.title}</h4>
-                        <p className="text-xs text-gray-400 truncate">{song.artist}</p>
-                      </div>
+          {/* PLAYLISTS VIEW */}
+          {activeTab === 'Playlists' && (
+            <div className="p-6 pt-10">
+              <h1 className="text-2xl font-bold text-white mb-8">Your Playlists</h1>
+              <div className="space-y-3 pb-6">
+                {playlists.map((pl) => (
+                  <div
+                    key={pl.id}
+                    onClick={() => {
+                      setCurrentViewPlaylist(pl);
+                      setActiveTab('PlaylistDetails');
+                    }}
+                    className="flex items-center gap-4 bg-[#1a1c2a] p-4 rounded-2xl cursor-pointer border border-[#262837]"
+                  >
+                    <div className="w-12 h-12 bg-[#262837] rounded-xl flex items-center justify-center text-[#8cd92b]">
+                      <List size={24} />
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-
-
-            {/* PROFILE (LISTENING STATS) VIEW */}
-            {activeTab === 'Profile' && (
-              <div className="p-6 pt-12 h-full bg-[#121212] overflow-y-auto no-scrollbar">
-                <div className="text-center mb-10">
-                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#8cd92b] to-[#22c7b5] mx-auto p-1 mb-4 shadow-[0_0_30px_rgba(140,217,43,0.3)]">
-                    <img src="/logo.png" className="w-full h-full rounded-full border-4 border-[#121212] object-cover" alt="User" />
-                  </div>
-                  <h2 className="text-2xl font-black text-white">Music Lover</h2>
-                  <p className="text-white/50 text-sm font-bold mt-1">ISAI Premium User</p>
-                </div>
-
-                <h3 className="text-lg font-black text-white mb-4">Your Listening Stats 📊</h3>
-                <div className="grid grid-cols-2 gap-4 mb-8">
-                  <div className="bg-[#1a1c2a] p-5 rounded-3xl border border-white/5">
-                    <Headphones size={24} className="text-[#8cd92b] mb-3" />
-                    <p className="text-white text-3xl font-black">{listenHistory.length}</p>
-                    <p className="text-white/40 text-[11px] font-bold uppercase tracking-wider mt-1">Total Streams</p>
-                  </div>
-                  <div className="bg-[#1a1c2a] p-5 rounded-3xl border border-white/5">
-                    <Clock size={24} className="text-[#22c7b5] mb-3" />
-                    <p className="text-white text-3xl font-black">
-                      {Math.floor(totalListeningSeconds / 3600)}h {Math.floor((totalListeningSeconds % 3600) / 60)}m
-                    </p>
-                    <p className="text-white/40 text-[11px] font-bold uppercase tracking-wider mt-1">Time Listened</p>
-                  </div>
-                </div>
-
-                <h3 className="text-lg font-black text-white mb-4">Badges & Achievements 🏆</h3>
-                <div className="space-y-3 mb-10">
-                  <div className="flex items-center gap-4 bg-[#1a1c2a] p-4 rounded-2xl border border-[#ff4500]/30 shadow-[0_5px_20px_rgba(255,69,0,0.1)]">
-                    <div className="w-12 h-12 rounded-xl bg-[#ff4500]/20 flex items-center justify-center text-2xl">🔥</div>
-                    <div>
-                      <h4 className="text-white font-bold">Trending Setter</h4>
-                      <p className="text-white/50 text-xs mt-0.5">Listened to 10+ Top Chart songs.</p>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-white text-sm">{pl.name}</h4>
+                      <p className="text-xs text-gray-500">{pl.songs.length} songs</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 bg-[#1a1c2a] p-4 rounded-2xl border border-white/5">
-                    <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-2xl opacity-50">🎸</div>
-                    <div>
-                      <h4 className="text-white font-bold opacity-50">Anirudh Fanatic (Locked)</h4>
-                      <p className="text-white/50 text-xs mt-0.5">Stream Anirudh 50 times to unlock.</p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* PLAYLIST DETAILS VIEW */}
+          {activeTab === 'PlaylistDetails' && currentViewPlaylist && (
+            <div className="p-6 pt-10 h-full">
+              <div className="flex items-center gap-4 mb-8">
+                <button onClick={() => setActiveTab('Playlists')} className="w-10 h-10 flex items-center justify-center bg-[#1a1c2a] rounded-full text-white">
+                  <ArrowLeft size={18} />
+                </button>
+                <h2 className="text-xl font-bold text-white">{currentViewPlaylist.name}</h2>
+              </div>
+              <div className="space-y-3 pb-10">
+                {currentViewPlaylist.songs.map((song, idx) => (
+                  <div key={idx} onClick={() => playSong(song)} className="flex items-center gap-3 bg-[#1a1c2a] p-3 rounded-2xl cursor-pointer border border-[#262837]">
+                    <img src={song.thumbnail} alt="" className="w-12 h-12 rounded-xl object-cover" />
+                    <div className="flex-1 overflow-hidden">
+                      <h4 className="font-semibold text-white text-sm truncate">{song.title}</h4>
+                      <p className="text-xs text-gray-400 truncate">{song.artist}</p>
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+
+
+          {/* PROFILE (LISTENING STATS) VIEW */}
+          {activeTab === 'Profile' && (
+            <div className="p-6 pt-12 h-full bg-[#121212] overflow-y-auto no-scrollbar">
+              <div className="text-center mb-10">
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#8cd92b] to-[#22c7b5] mx-auto p-1 mb-4 shadow-[0_0_30px_rgba(140,217,43,0.3)]">
+                  <img src="/logo.png" className="w-full h-full rounded-full border-4 border-[#121212] object-cover" alt="User" />
+                </div>
+                <h2 className="text-2xl font-black text-white">Music Lover</h2>
+                <p className="text-white/50 text-sm font-bold mt-1">ISAI Premium User</p>
+              </div>
+
+              <h3 className="text-lg font-black text-white mb-4">Your Listening Stats 📊</h3>
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                <div className="bg-[#1a1c2a] p-5 rounded-3xl border border-white/5">
+                  <Headphones size={24} className="text-[#8cd92b] mb-3" />
+                  <p className="text-white text-3xl font-black">{listenHistory.length}</p>
+                  <p className="text-white/40 text-[11px] font-bold uppercase tracking-wider mt-1">Total Streams</p>
+                </div>
+                <div className="bg-[#1a1c2a] p-5 rounded-3xl border border-white/5">
+                  <Clock size={24} className="text-[#22c7b5] mb-3" />
+                  <p className="text-white text-3xl font-black">
+                    {Math.floor(totalListeningSeconds / 3600)}h {Math.floor((totalListeningSeconds % 3600) / 60)}m
+                  </p>
+                  <p className="text-white/40 text-[11px] font-bold uppercase tracking-wider mt-1">Time Listened</p>
+                </div>
+              </div>
+
+              <h3 className="text-lg font-black text-white mb-4">Badges & Achievements 🏆</h3>
+              <div className="space-y-3 mb-10">
+                <div className="flex items-center gap-4 bg-[#1a1c2a] p-4 rounded-2xl border border-[#8cd92b]/30 shadow-[0_5px_20px_rgba(140,217,43,0.1)]">
+                  <div className="w-12 h-12 rounded-xl bg-[#8cd92b]/20 flex items-center justify-center text-2xl">🔥</div>
+                  <div>
+                    <h4 className="text-white font-bold">Trending Setter</h4>
+                    <p className="text-white/50 text-xs mt-0.5">Listened to 10+ Top Chart songs.</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 bg-[#1a1c2a] p-4 rounded-2xl border border-white/5">
+                  <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-2xl opacity-50">🎸</div>
+                  <div>
+                    <h4 className="text-white font-bold opacity-50">Anirudh Fanatic (Locked)</h4>
+                    <p className="text-white/50 text-xs mt-0.5">Stream Anirudh 50 times to unlock.</p>
                   </div>
                 </div>
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
 
-        {/* NOW PLAYING VIEW */}
-        {activeTab === 'Music' && (
+        {/* NOW PLAYING FULL-SCREEN OVERLAY (Spotify/YouTube Music style slide-up) */}
+        {currentSong && (
           <div
-            className="flex flex-col flex-1 bg-[#121212] relative h-full"
+            className="absolute inset-0 z-50 flex flex-col bg-[#121212] transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
+            style={{ transform: isPlayerExpanded ? 'translateY(0)' : 'translateY(100%)' }}
             onTouchStart={(e) => { swipeTouchStartX.current = e.touches[0].clientX; swipeTouchStartY.current = e.touches[0].clientY; }}
             onTouchEnd={(e) => {
               if (swipeTouchStartX.current === null) return;
               const dx = e.changedTouches[0].clientX - swipeTouchStartX.current;
               const dy = e.changedTouches[0].clientY - swipeTouchStartY.current;
-              // PREMIUM: Swipe down to minimize
+              // Swipe down to minimize player
               if (dy > Math.abs(dx) && dy > 80) {
-                setActiveTab('Home');
+                setIsPlayerExpanded(false);
               }
               // Swipe left/right for Next/Prev
               else if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 60) {
@@ -2167,9 +2222,13 @@ export default function App() {
                 <div className="absolute inset-0 z-0 bg-black/30 pointer-events-none"></div>
               </>
             )}
-            <div className="flex items-center justify-between p-5 pt-10 z-10 relative">
-              <button onClick={() => setActiveTab('Home')} className="p-2 -ml-2 text-white/70 hover:text-white transition-all active:scale-75">
-                <ArrowLeft size={24} />
+            {/* Drag Handle */}
+            <div className="flex justify-center pt-4 pb-2 z-10 relative cursor-pointer" onClick={() => setIsPlayerExpanded(false)}>
+              <div className="w-10 h-1 rounded-full bg-white/25" />
+            </div>
+            <div className="flex items-center justify-between px-5 pb-2 z-10 relative">
+              <button onClick={() => setIsPlayerExpanded(false)} className="p-2 -ml-2 text-white/70 hover:text-white transition-all active:scale-75">
+                <ChevronDown size={28} />
               </button>
               <div className="text-center flex flex-col text-white font-semibold flex-1">
                 <span className="text-[10px] uppercase tracking-widest text-[#a0a0a0]">Now Playing</span>
@@ -2272,7 +2331,7 @@ export default function App() {
 
                 {/* Controls */}
                 <div className="flex items-center justify-between w-full max-w-[340px] mt-4 mb-8">
-                  <button className="text-[#1ed760] hover:text-white transition-all active:scale-75 p-2"><Shuffle size={20} /></button>
+                  <button className="text-[#8cd92b] hover:text-white transition-all active:scale-75 p-2"><Shuffle size={20} /></button>
                   <button onClick={playPrev} className="text-white hover:text-white transition-all active:scale-75 p-2"><SkipBack size={32} fill="currentColor" /></button>
 
                   <button
@@ -2288,7 +2347,7 @@ export default function App() {
 
                 {/* Bottom Tool Bar */}
                 <div className="flex items-center justify-between w-full max-w-[340px] px-2 mb-8 relative">
-                  <button onClick={() => setShowSleepModal(true)} className={`transition-all active:scale-75 flex flex-col items-center gap-1 ${sleepMinutesLeft > 0 ? 'text-[#1ed760]' : 'text-[#a0a0a0] hover:text-white'}`}>
+                  <button onClick={() => setShowSleepModal(true)} className={`transition-all active:scale-75 flex flex-col items-center gap-1 ${sleepMinutesLeft > 0 ? 'text-[#8cd92b]' : 'text-[#a0a0a0] hover:text-white'}`}>
                     <Clock size={20} className={sleepMinutesLeft > 0 ? 'animate-pulse' : ''} />
                     {sleepMinutesLeft > 0 && <span className="text-[8px] font-bold">{sleepMinutesLeft}m</span>}
                   </button>
@@ -2417,6 +2476,55 @@ export default function App() {
           </div>
         )}
 
+        {/* PREMIUM BOTTOM SHEET OPTIONS MENU */}
+        {showSongOptions && (
+          <div className="fixed inset-0 z-[100] animate-fade-in">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowSongOptions(null)} />
+            <div className="absolute bottom-0 left-0 right-0 glass-dark rounded-t-[40px] p-6 pb-[calc(2rem + env(safe-area-inset-bottom))] border-t border-white/10 animate-slide-up shadow-[0_-20px_60px_rgba(0,0,0,0.6)]">
+              {/* Handle */}
+              <div className="flex justify-center mb-6">
+                <div className="w-12 h-1.5 rounded-full bg-white/20" />
+              </div>
+
+              <div className="flex items-center gap-4 mb-8">
+                <img src={showSongOptions.thumbnail} className="w-16 h-16 rounded-2xl object-cover shadow-xl" alt="" />
+                <div className="flex-1 overflow-hidden">
+                  <h3 className="text-white font-black text-lg truncate leading-tight">{cleanTitle(showSongOptions.title)}</h3>
+                  <p className="text-white/40 text-[11px] font-bold uppercase tracking-widest truncate mt-1">{showSongOptions.artist}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {[
+                  { label: favoriteIds.has(showSongOptions.id) ? 'Remove from Favorites' : 'Add to Favorites', icon: <Heart size={20} fill={favoriteIds.has(showSongOptions.id) ? '#8cd92b' : 'none'} className={favoriteIds.has(showSongOptions.id) ? 'text-[#8cd92b]' : 'text-white'} />, action: () => { toggleFavorite(null, showSongOptions); setShowSongOptions(null); } },
+                  { label: 'Share this Song', icon: <Share2 size={20} />, action: () => { setShowShareCard(true); setShowSongOptions(null); } },
+                  { label: 'View Lyrics', icon: <FileText size={20} />, action: () => { setIsLyricsVisible(true); setShowSongOptions(null); } },
+                  { label: 'Add to Playlist', icon: <List size={20} />, action: () => { setShowPlaylistModal({ isOpen: true, songInfo: showSongOptions }); setShowSongOptions(null); } },
+                  { label: 'Remove from History', icon: <Trash2 size={20} className="text-red-400" />, action: () => { setListenHistory(prev => prev.filter(s => s.id !== showSongOptions.id)); setShowSongOptions(null); } },
+                ].map((option, i) => (
+                  <button
+                    key={i}
+                    onClick={option.action}
+                    className="w-full h-14 flex items-center gap-4 px-4 glass-card rounded-2xl active:scale-95 transition-all outline-none"
+                  >
+                    <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5">
+                      {option.icon}
+                    </div>
+                    <span className="text-white/80 font-bold text-sm">{option.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setShowSongOptions(null)}
+                className="w-full h-14 mt-4 flex items-center justify-center text-white/40 font-black uppercase tracking-widest text-[11px]"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* PLAYLIST MODAL */}
         {showPlaylistModal.isOpen && (
           <div className="absolute inset-0 z-50 bg-[#121422]/90 backdrop-blur-sm flex flex-col justify-end transition-all">
@@ -2470,36 +2578,40 @@ export default function App() {
         )}
 
         {/* PREMIUM MOBILE MINI PLAYER (Floating Control with sleek Glassmorphism) */}
-        {currentSong && activeTab !== 'Music' && (
+        {currentSong && !isPlayerExpanded && (
           <div
-            onClick={() => setActiveTab('Music')}
-            className="absolute left-3 right-3 bg-black/50 backdrop-blur-2xl rounded-[20px] p-2 flex items-center gap-3 border border-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.6)] z-40 cursor-pointer animate-slide-up overflow-hidden group"
-            style={{ bottom: 'calc(5.5rem + env(safe-area-inset-bottom))' }}
+            onClick={() => setIsPlayerExpanded(true)}
+            className="absolute left-4 right-4 glass-dark rounded-[24px] p-3 flex items-center gap-4 shadow-[0_25px_60px_rgba(0,0,0,0.8)] z-40 cursor-pointer animate-slide-up overflow-hidden group border border-white/10"
+            style={{ bottom: 'calc(6rem + env(safe-area-inset-bottom))' }}
           >
-            {/* Mini Progress Bar Line at bottom */}
-            <div className="absolute bottom-0 left-0 h-[2px] bg-white/20 w-full">
-              <div
-                className="h-full bg-[#8cd92b] transition-all duration-200"
-                style={{ width: `${(progress / (duration || 1)) * 100}%`, boxShadow: '0 0 10px #8cd92b' }}
-              />
+            {/* Dynamic Ambient Glow behind art */}
+            <div className="absolute top-20 -left-20 w-80 h-80 rounded-full blur-[120px] opacity-20 pointer-events-none" style={{ backgroundColor: dominantColor }} />
+            <div className="absolute -bottom-20 -right-20 w-80 h-80 rounded-full blur-[120px] opacity-10 pointer-events-none" style={{ backgroundColor: dominantColor }} />
+
+            <div className="relative w-11 h-11 shrink-0">
+              <img src={currentSong.thumbnail} alt="" className={`w-full h-full rounded-[14px] object-cover shadow-2xl ${isPlaying ? 'animate-pulse' : ''}`} />
             </div>
 
-            <div className="relative w-12 h-12 shrink-0 transition-transform active:scale-95">
-              <img src={currentSong.thumbnail} alt="" className={`w-full h-full rounded-[14px] object-cover shadow-md ${isPlaying ? 'animate-slow-pulse' : ''}`} />
+            <div className="flex-1 overflow-hidden">
+              <h4 className="text-white text-sm font-black truncate leading-tight tracking-tight">{cleanTitle(currentSong.title)}</h4>
+              <p className="text-[10px] text-white/40 truncate mt-0.5 font-bold uppercase tracking-widest">{currentSong.artist?.replace(/ - Topic| VEVO/gi, '')}</p>
             </div>
 
-            <div className="flex-1 overflow-hidden py-1">
-              <h4 className="text-white text-[13px] font-bold truncate leading-tight drop-shadow-md">{cleanTitle(currentSong.title)}</h4>
-              <p className="text-[10px] text-white/50 truncate mt-0.5 drop-shadow-sm">{currentSong.artist?.replace(/ - Topic| VEVO/gi, '')}</p>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0 pr-2">
-              <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="w-10 h-10 flex items-center justify-center bg-white rounded-full text-black hover:scale-105 active:scale-90 transition-all shadow-lg" >
-                {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
+            <div className="flex items-center gap-1.5 shrink-0 pr-1">
+              <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="w-10 h-10 flex items-center justify-center bg-white text-black rounded-full active:scale-90 transition-all shadow-xl">
+                {isPlaying ? <Pause size={18} fill="black" /> : <Play size={18} fill="black" className="ml-0.5" />}
               </button>
-              <button onClick={(e) => { e.stopPropagation(); playNext(); }} className="w-8 h-8 flex items-center justify-center text-white/80 hover:text-white transition-all active:scale-75">
+              <button onClick={(e) => { e.stopPropagation(); playNext(); }} className="w-9 h-9 flex items-center justify-center text-white/50 active:scale-75 transition-all">
                 <SkipForward size={20} fill="currentColor" />
               </button>
+            </div>
+
+            {/* Mini Progress Bar */}
+            <div className="absolute bottom-0 left-0 h-[3px] bg-white/5 w-full">
+              <div
+                className="h-full progress-glow transition-all duration-200"
+                style={{ width: `${(progress / (duration || 1)) * 100}%` }}
+              />
             </div>
           </div>
         )}
@@ -2548,26 +2660,31 @@ export default function App() {
           </div>
         )}
 
-        {/* Bottom Navigation */}
-        <div className="absolute bottom-0 w-full h-[calc(5rem+env(safe-area-inset-bottom))] bg-[#121422]/95 backdrop-blur-xl border-t border-[#262837]/50 flex items-center justify-around px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] rounded-none z-10 shadow-[0_-10px_30px_rgba(0,0,0,0.3)]">
-          <button onClick={() => setActiveTab('Home')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-16 h-12 rounded-xl active:scale-90 active:opacity-70 ${activeTab === 'Home' ? 'text-[#8cd92b]' : 'text-gray-500'}`}>
-            <Home size={20} />
-            {activeTab === 'Home' && <span className="w-1 h-1 rounded-full bg-[#8cd92b] animate-pulse"></span>}
+        {/* PREMIUM FLOATING NAVIGATION ISLAND */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[min(380px,94%)] h-16 glass-dark rounded-[26px] border border-white/10 flex items-center justify-around px-2 z-[60] shadow-[0_20px_50px_rgba(0,0,0,0.6)] animate-slide-up-premium">
+          <button onClick={() => setActiveTab('Home')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-14 h-12 rounded-2xl active:scale-90 ${activeTab === 'Home' ? 'text-[#8cd92b]' : 'text-white/30'}`}>
+            <Home size={22} variant={activeTab === 'Home' ? 'fill' : 'linear'} />
+            {activeTab === 'Home' && <div className="w-1.5 h-1.5 rounded-full bg-[#8cd92b] shadow-[0_0_10px_#8cd92b]" />}
           </button>
 
-          <button onClick={() => setActiveTab('Search')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-16 h-12 rounded-xl active:scale-90 active:opacity-70 ${activeTab === 'Search' ? 'text-[#8cd92b]' : 'text-gray-500'}`}>
-            <Search size={20} />
-            {activeTab === 'Search' && <span className="w-1 h-1 rounded-full bg-[#8cd92b] animate-pulse"></span>}
+          <button onClick={() => setActiveTab('Search')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-14 h-12 rounded-2xl active:scale-90 ${activeTab === 'Search' ? 'text-[#8cd92b]' : 'text-white/30'}`}>
+            <Search size={22} />
+            {activeTab === 'Search' && <div className="w-1.5 h-1.5 rounded-full bg-[#8cd92b] shadow-[0_0_10px_#8cd92b]" />}
           </button>
 
-          <button onClick={() => setActiveTab('Profile')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-16 h-12 rounded-xl active:scale-90 active:opacity-70 ${activeTab === 'Profile' ? 'text-[#22c7b5]' : 'text-gray-500'}`}>
-            <User size={20} />
-            {activeTab === 'Profile' && <span className="w-1 h-1 rounded-full bg-[#22c7b5] animate-pulse"></span>}
+          <button
+            onClick={() => currentSong && setIsPlayerExpanded(p => !p)}
+            className={`relative flex flex-col items-center justify-center w-14 h-12 transition-all active:scale-90 ${isPlayerExpanded ? 'text-[#8cd92b]' : currentSong ? 'text-white' : 'text-white/30'}`}
+          >
+            <div className={`p-2 rounded-full transition-all ${isPlaying ? 'bg-[#8cd92b]/10 scale-110 shadow-[0_0_20px_rgba(140,217,43,0.2)]' : ''}`}>
+              <Headphones size={22} />
+            </div>
+            {isPlaying && <span className="absolute top-2 right-2 w-2 h-2 bg-[#8cd92b] rounded-full animate-ping" />}
           </button>
 
-          <button onClick={() => setActiveTab('Music')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-16 h-12 rounded-xl active:scale-90 active:opacity-70 ${activeTab === 'Music' ? 'text-[#8cd92b]' : 'text-gray-500'}`}>
-            <Headphones size={20} />
-            {activeTab === 'Music' && <span className="w-1 h-1 rounded-full bg-[#8cd92b] animate-pulse"></span>}
+          <button onClick={() => setActiveTab('Profile')} className={`flex flex-col items-center justify-center gap-1.5 transition-all w-14 h-12 rounded-2xl active:scale-90 ${activeTab === 'Profile' ? 'text-[#22c7b5]' : 'text-white/30'}`}>
+            <User size={22} />
+            {activeTab === 'Profile' && <div className="w-1.5 h-1.5 rounded-full bg-[#22c7b5] shadow-[0_0_10px_#22c7b5]" />}
           </button>
         </div>
 
@@ -2622,7 +2739,7 @@ export default function App() {
               </h3>
             </div>
             <div className="space-y-1">
-              {(songs.length > 0 ? songs : displaySongs).map((song, idx) => (
+              {(songs.length > 0 ? songs : fallbackSongs).map((song, idx) => (
                 <DesktopSongRow
                   key={song.id}
                   song={song}
