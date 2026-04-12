@@ -1705,7 +1705,7 @@ export default function App() {
                           className="flex flex-col items-center gap-3 shrink-0 active:scale-95 transition-all group cursor-pointer"
                         >
                           <div
-                            className="relative w-20 h-20 rounded-[28px] overflow-hidden shadow-xl transition-all group-active:scale-90"
+                            className="relative w-28 h-28 rounded-[36px] overflow-hidden shadow-xl transition-all group-active:scale-90"
                             style={{ border: `2px solid ${director.accentColor}55` }}
                           >
                             <img
@@ -1717,12 +1717,12 @@ export default function App() {
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
                             <span className="absolute bottom-1 right-1 text-sm drop-shadow-lg leading-none">{director.emoji}</span>
                             <div
-                              className="absolute inset-0 rounded-[26px] opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                              className="absolute inset-0 rounded-[34px] opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                               style={{ boxShadow: `inset 0 0 0 2px ${director.accentColor}` }}
                             />
                           </div>
                           <span
-                            className="text-white text-[11px] font-black text-center leading-tight w-20 truncate"
+                            className="text-white text-[12px] font-black text-center leading-tight w-28 truncate px-1"
                             style={{ textShadow: `0 0 10px ${director.accentColor}88` }}
                           >
                             {director.name}
