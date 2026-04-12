@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 // Build ID: 2026-03-05-MEGAUPDATE
 import ReactPlayer from 'react-player';
 import { Home, Music, Search, User, Play, Pause, SkipBack, SkipForward, Heart, MoreHorizontal, MoreVertical, ArrowLeft, Shuffle, Repeat, Upload, List, Headphones, Book, Download, Clock, Settings, LogOut, Bell, ChevronRight, ChevronUp, ChevronDown, Plus, X, FolderPlus, Mic2, Share2, Wifi, WifiOff, History, Gauge, CheckCircle2, Camera, Instagram, Flame, Award, BarChart2, Trash2, FileText } from 'lucide-react';
@@ -330,7 +330,7 @@ export default function App() {
   const MUSIC_DIRECTORS = [
     {
       id: 'anirudh', name: 'Anirudh', color: 'from-[#1a1a2e] to-[#16213e]', emoji: '🎸', subtitle: 'Music Director',
-      photo: 'public/anirudh.jpg',
+      photo: '/anirudh.jpg',
       accentColor: '#8cd92b',
       query: 'Anirudh Ravichander tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
@@ -342,7 +342,7 @@ export default function App() {
     },
     {
       id: 'arrahman', name: 'A.R. Rahman', color: 'from-[#1a1a2e] to-[#16213e]', emoji: '🎹', subtitle: 'Music Director',
-      photo: 'public/ar.jpg',
+      photo: '/ar.jpg',
       accentColor: '#22c7b5',
       query: 'AR Rahman tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
@@ -354,7 +354,7 @@ export default function App() {
     },
     {
       id: 'harris', name: 'Harris Jayaraj', color: 'from-[#1a1a2e] to-[#16213e]', emoji: '🎻', subtitle: 'Music Director',
-      photo: 'public/harrish.jpg',
+      photo: '/harrish.jpg',
       accentColor: '#f59e0b',
       query: 'Harris Jayaraj tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
@@ -366,7 +366,7 @@ export default function App() {
     },
     {
       id: 'yuvan', name: 'Yuvan Shankar Raja', color: 'from-[#1a1a2e] to-[#16213e]', emoji: '🎵', subtitle: 'Music Director',
-      photo: 'public/yuvan.jpg',
+      photo: '/yuvan.jpg',
       accentColor: '#a855f7',
       query: 'Yuvan Shankar Raja tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
@@ -378,7 +378,7 @@ export default function App() {
     },
     {
       id: 'deva', name: 'Deva', color: 'from-[#1a1a2e] to-[#16213e]', emoji: '🥁', subtitle: 'Music Director',
-      photo: 'public/deva.jpg',
+      photo: '/deva.jpg',
       accentColor: '#ef4444',
       query: 'Deva tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
@@ -390,7 +390,7 @@ export default function App() {
     },
     {
       id: 'ilayaraja', name: 'Ilaiyaraaja', color: 'from-[#1a1a2e] to-[#16213e]', emoji: '🎼', subtitle: 'Music Director',
-      photo: 'public/ilayaraja.jpg',
+      photo: '/ilayaraja.jpg',
       accentColor: '#f97316',
       query: 'Ilaiyaraaja evergreen tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
@@ -402,7 +402,7 @@ export default function App() {
     },
     {
       id: 'gv', name: 'G.V. Prakash', color: 'from-[#1a1a2e] to-[#16213e]', emoji: '🎤', subtitle: 'Music Director',
-      photo: 'public/gv.jpg',
+      photo: '/gv.jpg',
       accentColor: '#06b6d4',
       query: 'GV Prakash Kumar tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
@@ -414,7 +414,7 @@ export default function App() {
     },
     {
       id: 'sid', name: 'Sid Sriram', color: 'from-[#1a1a2e] to-[#16213e]', emoji: '🎧', subtitle: 'Top Singer',
-      photo: 'public/sid.jpg',
+      photo: '/sid.jpg',
       accentColor: '#ec4899',
       query: 'Sid Sriram tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
