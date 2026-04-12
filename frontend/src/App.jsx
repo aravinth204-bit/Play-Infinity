@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 // Build ID: 2026-03-05-MEGAUPDATE
 import ReactPlayer from 'react-player';
-import { Home, Music, Search, User, Play, Pause, SkipBack, SkipForward, Heart, MoreHorizontal, ArrowLeft, Shuffle, Repeat, Upload, List, Headphones, Book, Download, Clock, Settings, LogOut, Bell, ChevronRight, ChevronUp, ChevronDown, Plus, X, FolderPlus, Mic2, Share2, Wifi, WifiOff, History, Gauge, CheckCircle2, Camera, Instagram, Flame, Award, BarChart2, Trash2, FileText } from 'lucide-react';
+import { Home, Music, Search, User, Play, Pause, SkipBack, SkipForward, Heart, MoreHorizontal, MoreVertical, ArrowLeft, Shuffle, Repeat, Upload, List, Headphones, Book, Download, Clock, Settings, LogOut, Bell, ChevronRight, ChevronUp, ChevronDown, Plus, X, FolderPlus, Mic2, Share2, Wifi, WifiOff, History, Gauge, CheckCircle2, Camera, Instagram, Flame, Award, BarChart2, Trash2, FileText } from 'lucide-react';
 import { formatTime } from './utils';
 import { toPng } from 'html-to-image';
 
@@ -91,6 +91,18 @@ const DesktopSongRow = React.memo(function DesktopSongRow({
     </div>
   );
 });
+
+const cleanTitle = (title = '') => {
+  return title.replace(/\s*\[[^\]]*\]|\([^)]*\)\s*/g, '').replace(/official|video|audio|lyric|lyrics/gi, '').trim();
+};
+
+const GENRE_CHIPS = [
+  { label: 'Trending', query: 'latest trending hit songs tamil audio' },
+  { label: 'Melodies', query: 'evergreen melody hit songs tamil audio' },
+  { label: 'Workout', query: 'workout motivational energetic hit songs tamil audio' },
+  { label: 'Party', query: 'party dance hit songs tamil audio' },
+  { label: 'Sad', query: 'sad emotional hit songs tamil audio' }
+];
 
 export default function App() {
 
@@ -2735,7 +2747,7 @@ export default function App() {
           <div className="flex-1 overflow-y-auto no-scrollbar pb-10 flex flex-col pt-2">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold text-white tracking-wide">
-                {shouldShowQueue ? "Up Next" : (songs.length > 0 ? "Search Results" : "Suggested For You")}
+                {songs.length > 0 ? "Search Results" : "Suggested For You"}
               </h3>
             </div>
             <div className="space-y-1">
