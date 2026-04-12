@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+﻿import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 // Build ID: 2026-03-05-MEGAUPDATE
 import ReactPlayer from 'react-player';
 import { Home, Music, Search, User, Play, Pause, SkipBack, SkipForward, Heart, MoreHorizontal, MoreVertical, ArrowLeft, Shuffle, Repeat, Upload, List, Headphones, Book, Download, Clock, Settings, LogOut, Bell, ChevronRight, ChevronUp, ChevronDown, Plus, X, FolderPlus, Mic2, Share2, Wifi, WifiOff, History, Gauge, CheckCircle2, Camera, Instagram, Flame, Award, BarChart2, Trash2, FileText } from 'lucide-react';
@@ -329,7 +329,9 @@ export default function App() {
   // ──────────────────────────────────────────────────────
   const MUSIC_DIRECTORS = [
     {
-      id: 'anirudh', name: 'Anirudh', color: 'from-[#8cd92b] to-[#22c7b5]', emoji: '🎸', subtitle: 'Music Director',
+      id: 'anirudh', name: 'Anirudh', color: 'from-[#1a1a2e] to-[#16213e]', emoji: '🎸', subtitle: 'Music Director',
+      photo: 'public/anirudh.jpg',
+      accentColor: '#8cd92b',
       query: 'Anirudh Ravichander tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
         'Anirudh Ravichander Vijay songs tamil audio',
@@ -339,7 +341,9 @@ export default function App() {
       ]
     },
     {
-      id: 'arrahman', name: 'A.R. Rahman', color: 'from-[#8cd92b] to-[#22c7b5]', emoji: '🎹', subtitle: 'Music Director',
+      id: 'arrahman', name: 'A.R. Rahman', color: 'from-[#1a1a2e] to-[#16213e]', emoji: '🎹', subtitle: 'Music Director',
+      photo: 'public/ar.jpg',
+      accentColor: '#22c7b5',
       query: 'AR Rahman tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
         'AR Rahman Roja Bombay tamil songs audio',
@@ -349,7 +353,9 @@ export default function App() {
       ]
     },
     {
-      id: 'harris', name: 'Harris Jayaraj', color: 'from-[#8cd92b] to-[#22c7b5]', emoji: '🎻', subtitle: 'Music Director',
+      id: 'harris', name: 'Harris Jayaraj', color: 'from-[#1a1a2e] to-[#16213e]', emoji: '🎻', subtitle: 'Music Director',
+      photo: 'public/harrish.jpg',
+      accentColor: '#f59e0b',
       query: 'Harris Jayaraj tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
         'Harris Jayaraj Ghajini Kaakha Kaakha songs',
@@ -359,7 +365,9 @@ export default function App() {
       ]
     },
     {
-      id: 'yuvan', name: 'Yuvan Shankar Raja', color: 'from-[#8cd92b] to-[#22c7b5]', emoji: '🎵', subtitle: 'Music Director',
+      id: 'yuvan', name: 'Yuvan Shankar Raja', color: 'from-[#1a1a2e] to-[#16213e]', emoji: '🎵', subtitle: 'Music Director',
+      photo: 'public/yuvan.jpg',
+      accentColor: '#a855f7',
       query: 'Yuvan Shankar Raja tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
         'Yuvan Shankar Raja Mankatha Billa songs',
@@ -369,7 +377,9 @@ export default function App() {
       ]
     },
     {
-      id: 'deva', name: 'Deva', color: 'from-[#8cd92b] to-[#22c7b5]', emoji: '🥁', subtitle: 'Music Director',
+      id: 'deva', name: 'Deva', color: 'from-[#1a1a2e] to-[#16213e]', emoji: '🥁', subtitle: 'Music Director',
+      photo: 'public/deva.jpg',
+      accentColor: '#ef4444',
       query: 'Deva tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
         'Deva Rajinikanth Murasoli Muthal Mariyathai songs',
@@ -379,7 +389,9 @@ export default function App() {
       ]
     },
     {
-      id: 'ilayaraja', name: 'Ilaiyaraaja', color: 'from-[#8cd92b] to-[#22c7b5]', emoji: '🎼', subtitle: 'Music Director',
+      id: 'ilayaraja', name: 'Ilaiyaraaja', color: 'from-[#1a1a2e] to-[#16213e]', emoji: '🎼', subtitle: 'Music Director',
+      photo: 'public/ilayaraja.jpg',
+      accentColor: '#f97316',
       query: 'Ilaiyaraaja evergreen tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
         'Ilaiyaraaja Moondram Pirai Ninaithale Innikkum songs',
@@ -389,7 +401,9 @@ export default function App() {
       ]
     },
     {
-      id: 'gv', name: 'G.V. Prakash', color: 'from-[#8cd92b] to-[#22c7b5]', emoji: '🎤', subtitle: 'Music Director',
+      id: 'gv', name: 'G.V. Prakash', color: 'from-[#1a1a2e] to-[#16213e]', emoji: '🎤', subtitle: 'Music Director',
+      photo: 'public/gv.jpg',
+      accentColor: '#06b6d4',
       query: 'GV Prakash Kumar tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
         'GV Prakash Aadukalam Mynaa songs tamil',
@@ -399,7 +413,9 @@ export default function App() {
       ]
     },
     {
-      id: 'sid', name: 'Sid Sriram', color: 'from-[#8cd92b] to-[#22c7b5]', emoji: '🎧', subtitle: 'Top Singer',
+      id: 'sid', name: 'Sid Sriram', color: 'from-[#1a1a2e] to-[#16213e]', emoji: '🎧', subtitle: 'Top Singer',
+      photo: 'public/sid.jpg',
+      accentColor: '#ec4899',
       query: 'Sid Sriram tamil hit songs -jukebox -mashup -nonstop -shorts -reels -status',
       queries: [
         'Sid Sriram Kannaana Kanney tamil songs',
@@ -875,6 +891,7 @@ export default function App() {
 
   // ── QUICK GENRE SEARCH ────────────────────────────────────────────────────
   const GENRE_CHIPS = [
+    { label: '💪 Motivation', query: 'tamil motivational inspiring workout energetic songs' },
     { label: '💃 Kuthu', query: 'tamil kuthu mass dance songs' },
     { label: '❤️ Love', query: 'tamil love melody romantic songs' },
     { label: '😢 Sad', query: 'tamil sad feeling songs' },
@@ -914,105 +931,146 @@ export default function App() {
       const searchLower = searchQuery.toLowerCase();
       const combinedText = `${currentSongTitle} ${searchLower}`;
 
-      // ── MOOD / VIBE DETECTION ───────────────────────────────────────────
       const kuthuWords = ['kuthu', 'dance', 'mass', 'folk', 'fast', 'dappankuthu', 'vaathi', 'verithanam', 'rowdy', 'aaluma', 'nakku', 'seena', 'appadi', 'boss', 'billa', 'villain', 'thala', 'thalapathy', 'rajini', 'rajinikanth', 'beast mode', 'goat'];
       const loveWords = ['love', 'kadhal', 'romance', 'romantic', 'nee', 'yen', 'un', 'vaseegara', 'hosanna', 'munbe', 'minnale', 'kanave', 'kannam', 'kaadhal', 'priya', 'penne', 'love song', 'melody love', 'mannipaaya', 'yennai'];
       const sadWords = ['sad', 'sogam', 'pain', 'broken', 'lonely', 'kanneer', 'feeling', 'missing', 'thirumbi', 'ninaivugal', 'oru naal', 'life', 'vaazhkai', 'irukkindren', 'illaiyae'];
       const newWords = ['2024', '2025', '2023', 'new', 'latest', 'trending', 'recent', 'anirudh', 'gv prakash', 'sid sriram', 'beast', 'jailer', 'leo', 'amaran', 'vidaamuyarchi', 'goat'];
       const oldWords = ['80s', '90s', 'classic', 'evergreen', 'ilayaraja', 'ilaiyaraaja', 'spb', 'janaki', 'swarnalatha', 'old', 'golden', 'roja', 'bombay', 'mani ratnam', 'rajkumar', 'sivaji'];
       const devotionalWords = ['devotional', 'bhakti', 'murugan', 'amman', 'vinayagar', 'ayyappan', 'suprabhatam', 'kovil', 'god', 'prayer'];
+      const motivationalWords = ['motivational', 'motivation', 'workout', 'gym', 'inspire', 'inspiring', 'energetic', 'energy', 'power', 'powerful', 'hustle', 'grind', 'winner', 'success', 'champion', 'fighter', 'rise', 'beast', 'unstoppable', 'fire', 'sivakasi', 'vijay antony', 'theri bgm', 'mass bgm', 'theme'];
 
       const matches = (words) => words.some(w => combinedText.includes(w));
-
-      // Extract artist name (clean up YouTube artifacts)
       const rawArtist = (song.artist || '').replace(/ - topic|vevo|official|music/gi, '').split(',')[0].trim();
       const artist = rawArtist.length > 2 && rawArtist.toLowerCase() !== 'various artists' ? rawArtist : '';
+      const shuffleArr = (arr) => arr.sort(() => 0.5 - Math.random());
 
-      // ── BUILD QUERY LIST BASED ON DETECTED MOOD ─────────────────────────
-      let queryList = [];
+      let fullQueryPool = [];
 
-      if (matches(devotionalWords)) {
-        queryList = [
-          'tamil devotional songs Murugan Amman audio',
-          'SPB tamil devotional songs audio',
-          'tamil god songs Ayyappan Vinayagar audio',
-          'Veeramanidaasan devotional tamil songs',
-        ];
+      if (matches(motivationalWords)) {
+        fullQueryPool = shuffleArr([
+          'tamil motivational workout songs energetic audio',
+          'tamil mass BGM motivational songs audio',
+          'Anirudh motivational inspiring tamil songs audio',
+          'tamil gym workout energetic songs audio',
+          'Vijay mass inspiring songs tamil audio',
+          'Rajinikanth motivational theme songs audio',
+          'tamil fighter winner inspiring songs audio',
+          'GV Prakash energetic mass songs audio',
+          'Yuvan mass powerful theme songs audio',
+          'Ajith Kumar mass motivational songs audio',
+          'Dhanush powerful inspiring songs audio',
+          'tamil sports motivation song audio',
+          'Anirudh Vaathi Coming BGM mass songs',
+          'Harris Jayaraj mass energetic songs audio',
+          'Sivakarthikeyan motivational inspiring songs audio',
+          'tamil hustle grind motivational songs audio',
+        ]);
+      } else if (matches(devotionalWords)) {
+        fullQueryPool = shuffleArr([
+          'tamil devotional songs Murugan audio', 'SPB tamil devotional songs audio',
+          'tamil god songs Ayyappan Vinayagar audio', 'Veeramanidaasan devotional tamil songs',
+          'Unni Krishnan tamil devotional songs audio', 'Amman devotional tamil songs audio',
+          'Murugan padal tamil audio songs', 'Sivan padal tamil devotional audio',
+          'Ayyappan devotional songs SPB audio', 'Vinayagar songs tamil devotional audio',
+        ]);
       } else if (matches(sadWords)) {
-        queryList = [
-          'tamil sad melody songs audio',
-          'tamil feeling songs broken heart audio',
-          'Harris Jayaraj sad melody tamil songs',
-          'Yuvan Shankar Raja sad songs tamil audio',
-          'AR Rahman emotional tamil songs audio',
-        ];
+        fullQueryPool = shuffleArr([
+          'tamil sad melody songs audio', 'tamil feeling songs broken heart audio',
+          'Harris Jayaraj sad melody tamil songs', 'Yuvan Shankar Raja sad songs tamil audio',
+          'AR Rahman emotional tamil songs audio', 'Sid Sriram emotional sad tamil songs',
+          'Anirudh sad melody tamil songs audio', 'GV Prakash sad tamil songs audio',
+          'Tamil sad love failure songs audio', 'Ilaiyaraaja sad melody tamil classic songs',
+          'Dhanush sad songs tamil audio', 'Yuvan sad Vallavan Yaaradi melody audio',
+          'AR Rahman Iruvar sad songs audio', 'Harris Jayaraj Vinnaithaandi sad melody',
+          'Tamil feeling night drive songs audio', 'Sid Sriram Nenjame sad songs audio',
+        ]);
       } else if (matches(loveWords)) {
-        queryList = [
-          'tamil love melody romantic songs audio',
-          'Sid Sriram tamil love songs audio',
-          'AR Rahman romantic tamil songs audio',
-          'Harris Jayaraj love melody tamil songs',
-          'tamil kadhal melody songs Yuvan audio',
-        ];
+        fullQueryPool = shuffleArr([
+          'tamil love melody romantic songs audio', 'Sid Sriram tamil love songs audio',
+          'AR Rahman romantic tamil songs audio', 'Harris Jayaraj love melody tamil songs',
+          'tamil kadhal melody songs Yuvan audio', 'Anirudh romantic songs audio',
+          'Dhanush love songs mass melody audio', 'Simbu love songs tamil audio melody',
+          'GV Prakash love melody songs audio', 'Yuvan love songs 7G Rainbow Colony audio',
+          'AR Rahman Mani Ratnam romantic songs', 'Harris Jayaraj Minnale love songs',
+          'Sid Sriram Kannaana Kanney love melody', 'Tamil melody love songs evening audio',
+          'Ilaiyaraaja love songs classic melody audio', 'Anirudh love songs 2024 audio',
+        ]);
       } else if (matches(kuthuWords)) {
-        queryList = [
-          'tamil mass kuthu dance songs audio',
-          'Anirudh mass beat tamil songs audio',
-          'tamil folk kuthu songs audio',
-          'Devi Sri Prasad kuthu tamil songs audio',
-          'tamil party songs mass audio',
-        ];
+        fullQueryPool = shuffleArr([
+          'tamil mass kuthu dance songs audio', 'Anirudh mass beat tamil songs audio',
+          'tamil folk kuthu songs audio', 'Devi Sri Prasad kuthu tamil songs audio',
+          'tamil party songs mass audio', 'Yuvan Shankar Raja mass songs audio',
+          'Rajinikanth Darbar Petta mass songs audio', 'Vijay mass songs Bigil Mersal audio',
+          'GV Prakash kuthu mass songs audio', 'Tamil item song mass kuthu audio',
+          'Anirudh Vaathi Coming mass songs', 'Dhanush folk kuthu mass audio',
+          'Beast Rolex mass songs Anirudh audio', 'Ajith Kumar mass theme songs audio',
+          'Tamil mass trending 2024 songs audio', 'Vijay Sethupathi fun folk audio',
+        ]);
       } else if (matches(oldWords)) {
-        queryList = [
-          'Ilaiyaraaja evergreen 80s 90s tamil songs audio',
-          'SPB Janaki classic tamil melody songs',
-          'AR Rahman 90s Mani Ratnam tamil songs audio',
-          'Swarnalatha classic tamil songs audio',
-          'Deva classic Tamil hit songs audio',
-        ];
+        fullQueryPool = shuffleArr([
+          'Ilaiyaraaja evergreen 80s 90s tamil songs audio', 'SPB Janaki classic tamil melody songs',
+          'AR Rahman 90s Mani Ratnam tamil songs audio', 'Swarnalatha classic tamil songs audio',
+          'Deva classic Tamil hit songs audio', 'Ilaiyaraaja Moondram Pirai golden songs audio',
+          'SPB Chitra classic tamil melody audio', 'Vijay classic 90s Kadhal Virumbu audio',
+          'Rajinikanth 80s 90s classic songs audio', 'Kamal Haasan old classic songs audio',
+          'Ilaiyaraaja Nayagan Punnagai Mannan audio', 'MSV Tamil old classic songs audio',
+          'Tamil golden songs 70s 80s audio', 'TM Sounderarajan old hit songs audio',
+          'Ilaiyaraaja SPB duets classic audio', 'AR Rahman Roja Bombay classic audio',
+        ]);
       } else if (matches(newWords)) {
-        queryList = [
-          'Anirudh 2024 2025 tamil songs audio',
-          'Sid Sriram GV Prakash new tamil songs',
-          'Yuvan Anirudh latest tamil hit songs audio',
-          'Vijay Ajith 2024 tamil movie songs audio',
-          'new tamil songs 2025 trending audio',
-        ];
+        fullQueryPool = shuffleArr([
+          'Anirudh 2024 tamil songs audio', 'Sid Sriram GV Prakash new tamil songs',
+          'Yuvan Anirudh latest tamil hit songs audio', 'Vijay Ajith 2024 tamil songs audio',
+          'new tamil songs 2025 trending audio', 'Anirudh Amaran Vidaamuyarchi songs 2024',
+          'Leo Jailer Beast new songs Tamil audio', 'GV Prakash 2024 new tamil songs audio',
+          'Anirudh 2025 upcoming tamil film songs', 'Dhanush new 2024 tamil songs audio',
+          'Sivakarthikeyan new 2024 songs audio', 'Rajinikanth Thalaivar 2025 songs audio',
+          'Tamil trending chart hits 2024 audio', 'Anirudh Sid Sriram new songs 2025',
+          'Tamil new mass melody 2024 audio', 'Yuvan 2024 new songs tamil film audio',
+        ]);
       } else {
-        // Context-based: use artist + song title words
-        const titleWords = currentSongTitle.replace(/[^a-z0-9 ]/g, ' ').split(' ').filter(w => w.length > 3 && !['song', 'songs', 'audio', 'video', 'tamil', 'official', 'full', 'lyrics'].includes(w)).slice(0, 2).join(' ');
-        queryList = [
+        const titleWords = currentSongTitle
+          .replace(/[^a-z0-9 ]/g, ' ')
+          .split(' ')
+          .filter(w => w.length > 3 && !['song', 'songs', 'audio', 'video', 'tamil', 'official', 'full', 'lyrics'].includes(w))
+          .slice(0, 2).join(' ');
+        fullQueryPool = shuffleArr([
           artist ? `${artist} tamil songs audio` : 'tamil hit songs audio',
           titleWords ? `${titleWords} tamil songs audio` : 'tamil melody songs audio',
-          'Anirudh Yuvan tamil hit songs audio',
-          'AR Rahman Harris Jayaraj tamil songs audio',
-          'tamil love melody mass songs audio',
-        ];
+          'Anirudh Yuvan GV Prakash tamil hit songs audio',
+          'AR Rahman Harris Jayaraj tamil melody songs audio',
+          'Sid Sriram new tamil songs audio',
+          'Dhanush Vijay Ajith tamil songs audio',
+          artist ? `${artist} best hit songs audio` : 'tamil love songs audio',
+          'Tamil trending hit songs 2024 audio',
+          'Tamil melody mass mix songs audio',
+          'GV Prakash Anirudh latest tamil songs audio',
+          'Yuvan mass melody tamil songs audio',
+          'Tamil film songs collection hit audio',
+          'Ilaiyaraaja classic AR Rahman modern tamil mix',
+          'Tamil superhit songs Anirudh Yuvan audio',
+        ]);
       }
 
-      // ── PARALLEL FETCH ALL QUERIES ───────────────────────────────────────
+      // Pick 5 random queries from the large pool (different every call)
+      const queryList = fullQueryPool.slice(0, 5);
+
       const fetchResults = await Promise.allSettled(
         queryList.map(q =>
-          fetch(`${apiEndpoint}?q=${encodeURIComponent(q)}`)
+          fetch(`${apiEndpoint}?q=${encodeURIComponent(q)}&_t=${Date.now()}`)
             .then(r => r.json())
             .then(d => Array.isArray(d) ? d : (d.videos || []))
             .catch(() => [])
         )
       );
 
-      // Flatten
       let rawPool = fetchResults.flatMap(r => r.status === 'fulfilled' ? r.value : []);
-
-      // ── FILTER & DEDUPLICATE ─────────────────────────────────────────────
-      // Apply Tamil + base quality filter first
       rawPool = applyBaseFilter(applyTamilFilter(rawPool));
 
-      // Deduplicate by ID + normalized title (full key, not just 30 chars)
       const seenIds = new Set([song.id]);
       if (currentSong) seenIds.add(currentSong.id);
       sessionPlayedIds.current.forEach(id => seenIds.add(id));
 
-      // Use full normalized title key to prevent same-song variants slipping through
       const seenTitleKeys = new Set();
       seenTitleKeys.add(normalizeTitleKey(song.title || ''));
       if (currentSong) seenTitleKeys.add(normalizeTitleKey(currentSong.title || ''));
@@ -1021,38 +1079,42 @@ export default function App() {
       for (const s of rawPool) {
         if (!s || !s.id) continue;
         if (seenIds.has(s.id)) continue;
-        // Duration guard: skip very short (<90s) or very long (>7min) tracks
         if (s.durationSeconds && s.durationSeconds < 90) continue;
         if (s.durationSeconds && s.durationSeconds > 480) continue;
-        // Full normalized title key dedup
+
         const titleKey = normalizeTitleKey(s.title || '');
         if (titleKey && seenTitleKeys.has(titleKey)) continue;
-        // Skip if title too similar to the song being played OR to current song
         if (isLikelySameSong(s.title, song.title)) continue;
         if (currentSong && isLikelySameSong(s.title, currentSong.title)) continue;
+
+        // Skip songs already played this session (token similarity check)
+        const candidateTokens = titleTokenSet(s.title);
+        const alreadyPlayed = playedTitleTokenSetsRef.current.some(
+          played => tokenSimilarity(played, candidateTokens) >= 0.7
+        );
+        if (alreadyPlayed) continue;
+
         seenIds.add(s.id);
         if (titleKey) seenTitleKeys.add(titleKey);
         deduped.push(s);
       }
 
-      // Shuffle for variety, cap at 40
       const finalQueue = deduped.sort(() => 0.5 - Math.random()).slice(0, 40);
 
-      // ── MERGE INTO EXISTING QUEUE (no repeats, check title similarity too) ──
       setQueue(prevQueue => {
         const prevIds = new Set(prevQueue.map(s => s.id));
         prevIds.add(song.id);
         if (currentSong) prevIds.add(currentSong.id);
         sessionPlayedIds.current.forEach(id => prevIds.add(id));
-        // Also collect normalized titles of existing queue to prevent title dupes
+
         const prevTitleKeys = new Set(prevQueue.map(s => normalizeTitleKey(s.title || '')).filter(Boolean));
         if (currentSong) prevTitleKeys.add(normalizeTitleKey(currentSong.title || ''));
         prevTitleKeys.add(normalizeTitleKey(song.title || ''));
+
         const newEntries = finalQueue.filter(s => {
           if (prevIds.has(s.id)) return false;
           const tk = normalizeTitleKey(s.title || '');
           if (tk && prevTitleKeys.has(tk)) return false;
-          // Final similarity check against current + played song
           if (isLikelySameSong(s.title, song.title)) return false;
           if (currentSong && isLikelySameSong(s.title, currentSong.title)) return false;
           return true;
@@ -1166,6 +1228,7 @@ export default function App() {
 
     if (!fromQueue) {
       setQueue([]);
+      localStorage.removeItem('savedQueue'); // Clear stale queue — fresh start each song
       fetchQueue(song);
     } else {
       setQueue(prev => prev.filter(s => s.id !== song.id && !isLikelySameSong(s.title, song.title)));
@@ -1639,12 +1702,31 @@ export default function App() {
                         <div
                           key={director.id}
                           onClick={() => fetchDirectorSongs(director)}
-                          className="flex flex-col items-center gap-3 shrink-0 active:scale-95 transition-all group"
+                          className="flex flex-col items-center gap-3 shrink-0 active:scale-95 transition-all group cursor-pointer"
                         >
-                          <div className={`w-20 h-20 rounded-[28px] bg-gradient-to-br ${director.color} flex items-center justify-center text-3xl shadow-xl border border-white/20 group-active:rotate-3 group-active:scale-90 transition-all`}>
-                            <span className="drop-shadow-2xl">{director.emoji}</span>
+                          <div
+                            className="relative w-20 h-20 rounded-[28px] overflow-hidden shadow-xl transition-all group-active:scale-90"
+                            style={{ border: `2px solid ${director.accentColor}55` }}
+                          >
+                            <img
+                              src={director.photo}
+                              alt={director.name}
+                              className="absolute inset-0 w-full h-full object-cover object-top"
+                              onError={(e) => { e.target.style.display = "none"; }}
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+                            <span className="absolute bottom-1 right-1 text-sm drop-shadow-lg leading-none">{director.emoji}</span>
+                            <div
+                              className="absolute inset-0 rounded-[26px] opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                              style={{ boxShadow: `inset 0 0 0 2px ${director.accentColor}` }}
+                            />
                           </div>
-                          <span className="text-white text-[11px] font-black text-center leading-tight w-20 truncate">{director.name}</span>
+                          <span
+                            className="text-white text-[11px] font-black text-center leading-tight w-20 truncate"
+                            style={{ textShadow: `0 0 10px ${director.accentColor}88` }}
+                          >
+                            {director.name}
+                          </span>
                         </div>
                       ))}
                     </div>
