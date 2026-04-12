@@ -1604,24 +1604,58 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Featured Spotlight Card */}
+                  {/* Featured / Now Playing Spotlight Card */}
                   <div className="relative z-10 animate-slide-up-premium">
-                    <h2 className="text-xs font-black text-[#8cd92b] uppercase tracking-[3px] mb-3">Featured Playlist</h2>
-                    <div onClick={() => setActiveTab('Search')} className="bg-gradient-to-br from-white/10 to-transparent backdrop-blur-md rounded-[32px] p-6 border border-white/10 shadow-2xl group cursor-pointer active:scale-[0.98] transition-all overflow-hidden">
-                      <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-[#8cd92b] rounded-full blur-[60px] opacity-20 pointer-events-none" />
-                      <div className="flex items-center gap-5">
+                    <h2 className="text-xs font-black text-[#8cd92b] uppercase tracking-[3px] mb-3">
+                      {currentSong ? 'NOW PLAYING' : 'Featured Playlist'}
+                    </h2>
+                    <div 
+                      onClick={() => currentSong ? setIsPlayerExpanded(true) : setActiveTab('Search')} 
+                      className="bg-gradient-to-br from-white/10 to-transparent backdrop-blur-md rounded-[32px] p-6 border border-white/10 shadow-2xl group cursor-pointer active:scale-[0.98] transition-all overflow-hidden relative"
+                    >
+                      {/* Dynamic Background Glow */}
+                      <div 
+                        className="absolute -right-8 -bottom-8 w-40 h-40 rounded-full blur-[60px] opacity-20 pointer-events-none transition-colors duration-1000" 
+                        style={{ backgroundColor: currentSong ? dominantColor : '#8cd92b' }}
+                      />
+                      
+                      <div className="flex items-center gap-5 relative z-10">
                         <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-2xl shrink-0 border border-white/10">
-                          <img src={trendingSongs[0]?.thumbnail || "/logo.png"} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="" />
+                          <img 
+                            src={currentSong ? currentSong.thumbnail : (trendingSongs[0]?.thumbnail || "/logo.png")} 
+                            className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ${isPlaying && currentSong ? 'animate-pulse-slow' : ''}`} 
+                            alt="" 
+                          />
                         </div>
-                        <div className="flex-1">
-                          <h3 className="text-xl font-black text-white leading-tight mb-2">Tamil Hits <br /> 2025</h3>
+                        <div className="flex-1 overflow-hidden">
+                          <h3 className="text-xl font-black text-white leading-tight mb-2 truncate">
+                            {currentSong ? cleanTitle(currentSong.title) : <>Tamil Hits <br /> 2025</>}
+                          </h3>
                           <div className="flex items-center gap-2">
-                            <span className="px-2.5 py-1 bg-[#8cd92b]/20 text-[#8cd92b] text-[10px] font-black rounded-lg">TRENDING</span>
-                            <span className="text-white/50 text-xs font-bold">Listen Now</span>
+                            <span 
+                              className="px-2.5 py-1 text-[10px] font-black rounded-lg transition-colors"
+                              style={{ 
+                                backgroundColor: currentSong ? `${dominantColor}33` : '#8cd92b33', 
+                                color: currentSong ? dominantColor : '#8cd92b' 
+                              }}
+                            >
+                              {currentSong ? 'PLAYING NOW' : 'TRENDING'}
+                            </span>
+                            <span className="text-white/50 text-xs font-bold truncate">
+                              {currentSong ? currentSong.artist?.replace(/ - Topic| VEVO/gi, '') : 'Listen Now'}
+                            </span>
                           </div>
                         </div>
-                        <div className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center shrink-0 shadow-xl group-hover:scale-110 transition-transform">
-                          <Play size={20} fill="black" className="ml-1" />
+                        <div 
+                          onClick={(e) => {
+                            if (currentSong) {
+                              e.stopPropagation();
+                              togglePlay();
+                            }
+                          }}
+                          className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center shrink-0 shadow-xl group-hover:scale-110 transition-transform active:scale-90"
+                        >
+                          {isPlaying && currentSong ? <Pause size={22} fill="black" /> : <Play size={22} fill="black" className="ml-1" />}
                         </div>
                       </div>
                     </div>
