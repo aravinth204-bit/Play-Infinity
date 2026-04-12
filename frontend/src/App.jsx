@@ -1540,6 +1540,14 @@ export default function App() {
               volume={1}
               width="50px"
               height="50px"
+              config={{
+                youtube: {
+                  playerVars: {
+                    origin: window.location.origin,
+                    autoplay: 1,
+                  }
+                }
+              }}
             />
           ) : (
             <div className="bg-green-500 w-10 h-10">CORE MODE</div>
