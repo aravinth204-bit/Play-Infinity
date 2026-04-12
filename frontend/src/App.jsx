@@ -1139,9 +1139,10 @@ export default function App() {
     'https://pipedapi.kavin.rocks',
     'https://api.piped.victr.me',
     'https://piped-api.lunar.icu',
-    'https://api.piped.projectsegfau.lt',
     'https://pipedapi.metafates.me',
-    'https://api-piped.mha.fi'
+    'https://api-piped.mha.fi',
+    'https://pipedapi.drgns.space',
+    'https://pipedapi.synced.cloud'
   ];
 
   const fetchPipedStream = async (videoId) => {
