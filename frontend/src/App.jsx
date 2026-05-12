@@ -1258,10 +1258,12 @@ export default function App() {
       // Only set if we are still playing the same song
       if (directUrl && currentSongIdRef.current === song.id) {
         setDirectStreamUrl(directUrl);
+      } else if (!directUrl && currentSongIdRef.current === song.id) {
+        setUseIframeFallback(true);
       }
     }).catch(() => {
       if (currentSongIdRef.current === song.id) {
-        setDirectStreamUrl(null);
+        setUseIframeFallback(true);
       }
     });
   }, [currentSong, queue, isFetchingQueue, fallbackSongs, streamEndpointBase]);
@@ -1346,7 +1348,7 @@ export default function App() {
 
 
   const [directStreamUrl, setDirectStreamUrl] = useState(null);
-  const currentStreamUrl = directStreamUrl || (currentSong ? `${streamEndpointBase}?videoId=${currentSong.id}` : '');
+  const currentStreamUrl = directStreamUrl;
 
   // Mobile Background Playback & MediaSession API Logic
   const silentAudioRef = useRef(null);
@@ -1556,8 +1558,6 @@ export default function App() {
       if (isPlaying) {
         backgroundAudio.play().catch(e => {
           console.error("URL change play failed", e);
-          // If the URL fails, try to fallback to iframe
-          if (!useIframeFallback) setUseIframeFallback(true);
         });
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
       } else {
