@@ -1348,99 +1348,99 @@ export default function App() {
   playPrevRef.current = playPrev;
 
   const setupMediaSession = useCallback(() => {
-    if (!('mediaSession' in navigator) || !currentSong) return;
-
-    // Build artwork: prefer song thumbnail, fallback to logo
-    const artworkSizes = ['96x96', '128x128', '256x256', '512x512'];
-    const thumbUrl = currentSong.thumbnail || '/logo.png';
-    const artwork = artworkSizes.map(sizes => ({ src: thumbUrl, sizes, type: 'image/jpeg' }));
-    artwork.push({ src: '/logo.png', sizes: '512x512', type: 'image/png' });
-
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: currentSong.title || 'Unknown Title',
-      artist: currentSong.artist?.replace(/ - Topic| VEVO/gi, '') || 'ISAI',
-      album: 'ISAI (இசை)',
-      artwork,
-    });
-    navigator.mediaSession.playbackState = 'playing';
-
-    try {
-      navigator.mediaSession.setActionHandler('play', () => {
-        if (backgroundAudio) backgroundAudio.play().catch(() => {});
-        silentAudioRef.current?.play().catch(() => {});
-        setIsPlaying(true);
-        navigator.mediaSession.playbackState = 'playing';
+    if ('mediaSession' in navigator && currentSong) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentSong.title,
+        artist: currentSong.artist || 'Unknown Artist',
+        album: 'ISAI (இசை)',
+        artwork: [
+          { src: '/logo.png', sizes: '96x96', type: 'image/png' },
+          { src: '/logo.png', sizes: '128x128', type: 'image/png' },
+          { src: '/logo.png', sizes: '256x256', type: 'image/png' },
+          { src: '/logo.png', sizes: '512x512', type: 'image/png' },
+        ]
       });
 
-      navigator.mediaSession.setActionHandler('pause', () => {
-        if (backgroundAudio) backgroundAudio.pause();
-        silentAudioRef.current?.pause();
-        setIsPlaying(false);
-        navigator.mediaSession.playbackState = 'paused';
-      });
+      try {
+        navigator.mediaSession.setActionHandler('play', () => {
+          setIsPlaying(true);
+          if (backgroundAudio) backgroundAudio.play().catch(() => { });
+          silentAudioRef.current?.play().catch(() => { });
+          navigator.mediaSession.playbackState = 'playing';
+        });
 
-      navigator.mediaSession.setActionHandler('previoustrack', () => {
-        if (playPrevRef.current) playPrevRef.current();
-        navigator.mediaSession.playbackState = 'playing';
-      });
+        navigator.mediaSession.setActionHandler('pause', () => {
+          setIsPlaying(false);
+          if (backgroundAudio) backgroundAudio.pause();
+          silentAudioRef.current?.pause();
+          navigator.mediaSession.playbackState = 'paused';
+        });
 
-      navigator.mediaSession.setActionHandler('nexttrack', () => {
-        if (playNextRef.current) playNextRef.current();
-        navigator.mediaSession.playbackState = 'playing';
-      });
+        navigator.mediaSession.setActionHandler('previoustrack', () => {
+          if (playPrevRef.current) playPrevRef.current();
+          navigator.mediaSession.playbackState = 'playing';
+        });
 
-      // Seek backward 10s
-      navigator.mediaSession.setActionHandler('seekbackward', (details) => {
-        const skipTime = details?.seekOffset || 10;
-        const newPos = Math.max((backgroundAudio?.currentTime ?? 0) - skipTime, 0);
-        if (backgroundAudio) backgroundAudio.currentTime = newPos;
-        setProgress(newPos);
-      });
+        navigator.mediaSession.setActionHandler('nexttrack', () => {
+          if (playNextRef.current) playNextRef.current();
+          navigator.mediaSession.playbackState = 'playing';
+        });
 
-      // Seek forward 10s
-      navigator.mediaSession.setActionHandler('seekforward', (details) => {
-        const skipTime = details?.seekOffset || 10;
-        const newPos = Math.min((backgroundAudio?.currentTime ?? 0) + skipTime, duration || 999);
-        if (backgroundAudio) backgroundAudio.currentTime = newPos;
-        setProgress(newPos);
-      });
+        navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+          const skipTime = details.seekOffset || 10;
+          const newPos = Math.max(backgroundAudio ? backgroundAudio.currentTime - skipTime : progress - skipTime, 0);
+          if (backgroundAudio) backgroundAudio.currentTime = newPos;
+          if (playerRef.current) playerRef.current.seekTo(newPos, "seconds");
+          setProgress(newPos);
+        });
 
-      // Scrubber seek
-      navigator.mediaSession.setActionHandler('seekto', (details) => {
-        if (backgroundAudio) backgroundAudio.currentTime = details.seekTime;
-        setProgress(details.seekTime);
-      });
+        navigator.mediaSession.setActionHandler('seekforward', (details) => {
+          const skipTime = details.seekOffset || 10;
+          const newPos = Math.min(backgroundAudio ? backgroundAudio.currentTime + skipTime : progress + skipTime, duration || 999);
+          if (backgroundAudio) backgroundAudio.currentTime = newPos;
+          if (playerRef.current) playerRef.current.seekTo(newPos, "seconds");
+          setProgress(newPos);
+        });
 
-      navigator.mediaSession.setActionHandler('stop', () => {
-        if (backgroundAudio) backgroundAudio.pause();
-        silentAudioRef.current?.pause();
-        setIsPlaying(false);
-        navigator.mediaSession.playbackState = 'none';
-      });
-    } catch (e) {
-      console.warn('MediaSession handlers failed:', e);
+        navigator.mediaSession.setActionHandler('seekto', (details) => {
+          if (playerRef.current) {
+            playerRef.current.seekTo(details.seekTime, "seconds");
+          }
+          if (backgroundAudio) {
+            backgroundAudio.currentTime = details.seekTime;
+          }
+          setProgress(details.seekTime);
+        });
+
+        navigator.mediaSession.setActionHandler('stop', () => {
+          setIsPlaying(false);
+          if (backgroundAudio) backgroundAudio.pause();
+          silentAudioRef.current?.pause();
+          navigator.mediaSession.playbackState = 'none';
+        });
+      } catch (e) {
+        console.warn("MediaSession handlers failed:", e);
+      }
     }
-  }, [currentSong, duration, setIsPlaying]);
+  }, [currentSong, setIsPlaying]);
 
   useEffect(() => {
     setUseIframeFallback(false);
-    // Small delay lets the audio element load before MediaSession registers
-    const tid = setTimeout(() => setupMediaSession(), 300);
-    return () => clearTimeout(tid);
+    setupMediaSession();
   }, [currentSong, setupMediaSession]);
 
   useEffect(() => {
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
     }
-    // Drive the native audio element directly (avoids React batching delays in background)
-    if (backgroundAudio && !useIframeFallback) {
-      if (isPlaying) {
-        backgroundAudio.play().catch(() => {});
-        silentAudioRef.current?.play().catch(() => {});
+    // Update native audio directly to bypass React cycle in background
+    if (backgroundAudio) {
+      if (isPlaying && !useIframeFallback) {
+        backgroundAudio.play().catch(() => { });
+        if (silentAudioRef.current) silentAudioRef.current.play().catch(() => { });
       } else {
         backgroundAudio.pause();
-        silentAudioRef.current?.pause();
+        if (silentAudioRef.current) silentAudioRef.current.pause();
       }
     }
   }, [isPlaying, useIframeFallback]);
@@ -1503,61 +1503,41 @@ export default function App() {
   const swipeTouchStartX = useRef(null);
   const swipeTouchStartY = useRef(null);
 
-  // Ref mirrors isPlaying so stream-URL effect can read it without being re-triggered by it
-  const isPlayingRef = useRef(false);
-  isPlayingRef.current = isPlaying;
-  // Tracks last-loaded src to avoid re-setting on unrelated re-renders
-  const audioSrcRef = useRef('');
-
-  // backgroundAudio: wire up event handlers once (playNextRef keeps it stable)
+  // backgroundAudio setup and event handlers
   useEffect(() => {
-    if (!backgroundAudio) return;
-    backgroundAudio.onended = () => playNextRef.current();
-    backgroundAudio.ontimeupdate = () => setProgress(backgroundAudio.currentTime);
-    backgroundAudio.onloadedmetadata = () => {
-      setDuration(backgroundAudio.duration);
-      setupMediaSession();
-    };
-    backgroundAudio.onerror = (e) => {
-      console.error('Audio error:', e);
-      // Only fall back if it's a fatal decode/network error, not an abort
-      if (backgroundAudio.error && backgroundAudio.error.code !== MediaError.MEDIA_ERR_ABORTED) {
-        setUseIframeFallback(true);
+    if (backgroundAudio) {
+      backgroundAudio.onended = () => playNext();
+      backgroundAudio.ontimeupdate = () => setProgress(backgroundAudio.currentTime);
+      backgroundAudio.onloadeddata = () => setDuration(backgroundAudio.duration);
+      backgroundAudio.onerror = (e) => {
+        console.error("Audio player error:", e);
+        if (!useIframeFallback) setUseIframeFallback(true);
+      };
+    }
+  }, [playNext, useIframeFallback]);
+
+  useEffect(() => {
+    if (backgroundAudio && currentStreamUrl && !useIframeFallback) {
+      const currentPos = backgroundAudio.currentTime;
+      backgroundAudio.src = currentStreamUrl;
+      const savedProg = parseFloat(localStorage.getItem('savedProgress') || '0');
+
+      // If we are restoring from previous session without auto-playing
+      if (!isPlaying && savedProg > 0) {
+        backgroundAudio.currentTime = savedProg;
+      } else if (isPlaying && currentPos > 0) {
+        // Stream URL upgraded mid-playback, seamlessly continue
+        backgroundAudio.currentTime = currentPos;
       }
-    };
-  }, [playNextRef, setupMediaSession]);
 
-  // Load + play whenever the stream URL changes (new song or proxy→piped upgrade)
-  useEffect(() => {
-    if (!backgroundAudio || !currentStreamUrl || useIframeFallback) return;
-    // Skip if we already loaded this exact URL (prevents re-triggering on unrelated state changes)
-    if (audioSrcRef.current === currentStreamUrl) return;
-
-    const prevPos = backgroundAudio.currentTime;
-    audioSrcRef.current = currentStreamUrl;
-    backgroundAudio.src = currentStreamUrl;
-
-    // Restore saved position when bringing back a previous session silently
-    const savedProg = parseFloat(localStorage.getItem('savedProgress') || '0');
-    if (!isPlayingRef.current && savedProg > 1) {
-      backgroundAudio.currentTime = savedProg;
-      return; // don't auto-play a restored session
+      if (isPlaying) {
+        backgroundAudio.play().catch(e => {
+          console.error("URL change play failed", e);
+          if (!useIframeFallback) setUseIframeFallback(true);
+        });
+      }
     }
-    if (prevPos > 1) {
-      // Mid-play stream upgrade (proxy → piped): keep same position
-      backgroundAudio.currentTime = prevPos;
-    }
-
-    // Play only if the user has actively started playback
-    if (isPlayingRef.current) {
-      backgroundAudio.play().catch(e => {
-        console.error('Stream play failed:', e);
-        // Don't set iframe fallback on AbortError (rapid song switching)
-        if (e.name !== 'AbortError') setUseIframeFallback(true);
-      });
-      silentAudioRef.current?.play().catch(() => {});
-    }
-  }, [currentStreamUrl, useIframeFallback]);
+  }, [currentStreamUrl, useIframeFallback, isPlaying]);
 
   // No native player needed for web PWA
 
