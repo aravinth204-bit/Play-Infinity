@@ -92,8 +92,13 @@ const DesktopSongRow = React.memo(function DesktopSongRow({
   );
 });
 
-const cleanTitle = (title = '') => {
-  return title.replace(/\s*\[[^\]]*\]|\([^)]*\)\s*/g, '').replace(/official|video|audio|lyric|lyrics/gi, '').trim();
+const cleanTitle = (raw = '') => {
+  return raw
+    .replace(/\s*[|\-–—•·]\s*(official|lyric|lyrics|video|audio|song|songs|hd|hq|4k|8k|full|feat\.?|ft\.?|starring|music video|video song|audio song|tamil song|tamil|whatsapp status|status|remaster|remastered|\d{4})[^|\-–—•·]*/gi, '')
+    .replace(/\s*\([^)]{0,40}(official|lyric|audio|hd|remaster|\d{4})[^)]*\)/gi, '')
+    .replace(/\s*\[[^\]]{0,40}(official|lyric|audio|hd|remaster|\d{4})[^\]]*\]/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 };
 
 const GENRE_CHIPS = [
@@ -879,30 +884,7 @@ export default function App() {
     fetchTrending();
   }, []);
 
-  // ── CLEAN TITLE: Strip YouTube junk from song titles ─────────────────────
-  const cleanTitle = (raw = '') => {
-    return raw
-      .replace(/\s*[|\-–—•·]\s*(official|lyric|lyrics|video|audio|song|songs|hd|hq|4k|8k|full|feat\.?|ft\.?|starring|music video|video song|audio song|tamil song|tamil|whatsapp status|status|remaster|remastered|\d{4})[^|\-–—•·]*/gi, '')
-      .replace(/\s*\([^)]{0,40}(official|lyric|audio|hd|remaster|\d{4})[^)]*\)/gi, '')
-      .replace(/\s*\[[^\]]{0,40}(official|lyric|audio|hd|remaster|\d{4})[^\]]*\]/gi, '')
-      .replace(/\s{2,}/g, ' ')
-      .trim();
-  };
 
-  // ── QUICK GENRE SEARCH ────────────────────────────────────────────────────
-  const GENRE_CHIPS = [
-    { label: '💪 Motivation', query: 'tamil motivational inspiring workout energetic songs' },
-    { label: '💃 Kuthu', query: 'tamil kuthu mass dance songs' },
-    { label: '❤️ Love', query: 'tamil love melody romantic songs' },
-    { label: '😢 Sad', query: 'tamil sad feeling songs' },
-    { label: '🔥 Trending', query: 'Anirudh 2024 2025 tamil trending songs' },
-    { label: '🎸 Anirudh', query: 'Anirudh Ravichander tamil hit songs' },
-    { label: '🎹 Rahman', query: 'AR Rahman evergreen tamil songs' },
-    { label: '🎻 Harris', query: 'Harris Jayaraj tamil melody songs' },
-    { label: '🎵 Yuvan', query: 'Yuvan Shankar Raja tamil hit songs' },
-    { label: '📻 Classic', query: 'Ilaiyaraaja classic 80s 90s tamil songs' },
-    { label: '🎤 Sid', query: 'Sid Sriram tamil songs' },
-  ];
 
   const searchYoutube = async (e, overrideQuery) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -1520,8 +1502,6 @@ export default function App() {
   }, [currentSong, progress, duration]);
 
   // FEATURE: Swipe gestures on Now Playing
-  const swipeTouchStartX = useRef(null);
-  const swipeTouchStartY = useRef(null);
 
   // backgroundAudio setup and event handlers
   useEffect(() => {
