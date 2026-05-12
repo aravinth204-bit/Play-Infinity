@@ -1503,53 +1503,60 @@ export default function App() {
   const swipeTouchStartX = useRef(null);
   const swipeTouchStartY = useRef(null);
 
-  // Track which src we last set so we don't re-assign unnecessarily
+  // Ref mirrors isPlaying so stream-URL effect can read it without being re-triggered by it
+  const isPlayingRef = useRef(false);
+  isPlayingRef.current = isPlaying;
+  // Tracks last-loaded src to avoid re-setting on unrelated re-renders
   const audioSrcRef = useRef('');
 
-  // backgroundAudio setup and event handlers
+  // backgroundAudio: wire up event handlers once (playNextRef keeps it stable)
   useEffect(() => {
     if (!backgroundAudio) return;
-
-    backgroundAudio.onended = () => {
-      // Keep notification alive: update state to playing so next song
-      // doesn't send a 'paused' state before MediaSession re-registers.
-      playNextRef.current();
-    };
+    backgroundAudio.onended = () => playNextRef.current();
     backgroundAudio.ontimeupdate = () => setProgress(backgroundAudio.currentTime);
     backgroundAudio.onloadedmetadata = () => {
       setDuration(backgroundAudio.duration);
-      // Re-assert MediaSession so notification stays visible after stream switch
       setupMediaSession();
     };
-    backgroundAudio.onerror = () => {
-      if (!useIframeFallback) setUseIframeFallback(true);
+    backgroundAudio.onerror = (e) => {
+      console.error('Audio error:', e);
+      // Only fall back if it's a fatal decode/network error, not an abort
+      if (backgroundAudio.error && backgroundAudio.error.code !== MediaError.MEDIA_ERR_ABORTED) {
+        setUseIframeFallback(true);
+      }
     };
-  }, [playNextRef, useIframeFallback, setupMediaSession]);
+  }, [playNextRef, setupMediaSession]);
 
+  // Load + play whenever the stream URL changes (new song or proxy→piped upgrade)
   useEffect(() => {
     if (!backgroundAudio || !currentStreamUrl || useIframeFallback) return;
-    // Avoid re-setting the same src (prevents playback reset when only isPlaying changes)
+    // Skip if we already loaded this exact URL (prevents re-triggering on unrelated state changes)
     if (audioSrcRef.current === currentStreamUrl) return;
 
     const prevPos = backgroundAudio.currentTime;
     audioSrcRef.current = currentStreamUrl;
     backgroundAudio.src = currentStreamUrl;
 
-    // Restore session progress if we are not yet playing (app restore)
+    // Restore saved position when bringing back a previous session silently
     const savedProg = parseFloat(localStorage.getItem('savedProgress') || '0');
-    if (!isPlaying && savedProg > 0) {
+    if (!isPlayingRef.current && savedProg > 1) {
       backgroundAudio.currentTime = savedProg;
-    } else if (prevPos > 1) {
-      // Upgrading from proxy → piped stream mid-play: resume from same position
+      return; // don't auto-play a restored session
+    }
+    if (prevPos > 1) {
+      // Mid-play stream upgrade (proxy → piped): keep same position
       backgroundAudio.currentTime = prevPos;
     }
 
-    // Always auto-play on src change (new song / stream upgrade)
-    backgroundAudio.play().catch(e => {
-      console.error('Stream play failed:', e);
-      if (!useIframeFallback) setUseIframeFallback(true);
-    });
-    silentAudioRef.current?.play().catch(() => {});
+    // Play only if the user has actively started playback
+    if (isPlayingRef.current) {
+      backgroundAudio.play().catch(e => {
+        console.error('Stream play failed:', e);
+        // Don't set iframe fallback on AbortError (rapid song switching)
+        if (e.name !== 'AbortError') setUseIframeFallback(true);
+      });
+      silentAudioRef.current?.play().catch(() => {});
+    }
   }, [currentStreamUrl, useIframeFallback]);
 
   // No native player needed for web PWA
