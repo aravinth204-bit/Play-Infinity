@@ -112,18 +112,31 @@ export default function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
-
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [queue, setQueue] = useState([]);
   const [isFetchingQueue, setIsFetchingQueue] = useState(false);
-  const playerRef = useRef(null);
-  const sessionPlayedIds = useRef(new Set());
-  const playedTitleTokenSetsRef = useRef([]);
-  // Stack of songs played — for the ⏮ Previous button to navigate back
-  const playHistoryStack = useRef([]);
   const [trendingSongs, setTrendingSongs] = useState([]);
-
+  const [directStreamUrl, setDirectStreamUrl] = useState(null);
+  const [activeTab, setActiveTab] = useState('Home');
+  const [isPlayerExpanded, setIsPlayerExpanded] = useState(false);
+  const [dominantColor, setDominantColor] = useState('#8cd92b');
+  const [audioData, setAudioData] = useState(new Uint8Array(32).fill(0));
+  const [toasts, setToasts] = useState([]);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  const [sleepTimer, setSleepTimer] = useState(null);
+  const [sleepMinutesLeft, setSleepMinutesLeft] = useState(0);
+  const [showSleepModal, setShowSleepModal] = useState(false);
+  const [isLyricsVisible, setIsLyricsVisible] = useState(false);
+  const [visualizerMode, setVisualizerMode] = useState(0); // 0=Equalizer, 1=Halo Only, 2=Off
+  const [showShareCard, setShowShareCard] = useState(false);
+  const [showPlaylistModal, setShowPlaylistModal] = useState({ isOpen: false, songInfo: null });
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [currentViewPlaylist, setCurrentViewPlaylist] = useState(null);
+  const [showSongOptions, setShowSongOptions] = useState(null);
+  const [activeCategory, setActiveCategory] = useState('All');
 
   const [searchHistory, setSearchHistory] = useState(() => {
     try {
@@ -154,25 +167,26 @@ export default function App() {
     }
   });
 
-  const [showPlaylistModal, setShowPlaylistModal] = useState({ isOpen: false, songInfo: null });
-  const [newPlaylistName, setNewPlaylistName] = useState('');
-  const [currentViewPlaylist, setCurrentViewPlaylist] = useState(null);
-  const [activeTab, setActiveTab] = useState('Home');
-  const [isPlayerExpanded, setIsPlayerExpanded] = useState(false);
-  const [showSongOptions, setShowSongOptions] = useState(null);
-  const [activeCategory, setActiveCategory] = useState('All');
-
-  // Additional feature states
-  const [sleepTimer, setSleepTimer] = useState(null);
-  const [sleepMinutesLeft, setSleepMinutesLeft] = useState(0);
-  const [showSleepModal, setShowSleepModal] = useState(false);
-  const [isLyricsVisible, setIsLyricsVisible] = useState(false);
+  const playerRef = useRef(null);
+  const sessionPlayedIds = useRef(new Set());
+  const playedTitleTokenSetsRef = useRef([]);
+  const playHistoryStack = useRef([]);
   const sleepTimerRef = useRef(null);
-
-  // PREMIUM INTERACTIVE FEATURES (Insta Story, Swipe, Profile, Visualizer)
-  const [visualizerMode, setVisualizerMode] = useState(0); // 0=Equalizer, 1=Halo Only, 2=Off
-  const [showShareCard, setShowShareCard] = useState(false);
   const shareCardRef = useRef(null);
+  const analyserRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const sourceRef = useRef(null);
+  const silentAudioRef = useRef(null);
+  const lastAudioUrlRef = useRef('');
+  const wakeLockRef = useRef(null);
+  const swipeTouchStartX = useRef(null);
+  const swipeTouchStartY = useRef(null);
+  const playNextRef = useRef(null);
+  const playPrevRef = useRef(null);
+
+  const streamEndpointBase = 'https://play-infinity.vercel.app/api/stream';
+  const currentStreamUrl = directStreamUrl || (currentSong ? `${streamEndpointBase}?videoId=${currentSong.id}` : '');
+
   const favoriteIds = useMemo(() => new Set(favorites.map(s => s.id)), [favorites]);
   const fallbackSongs = useMemo(() => {
     if (songs.length > 0) return songs;
@@ -217,15 +231,7 @@ export default function App() {
     }
   };
 
-  // FEATURE: Dynamic UI & Audio Visualizer
-  const [dominantColor, setDominantColor] = useState('#8cd92b');
-  const [audioData, setAudioData] = useState(new Uint8Array(32).fill(0));
-  const analyserRef = useRef(null);
-  const audioCtxRef = useRef(null);
-  const sourceRef = useRef(null);
-
   // FEATURE: Toast Notifications
-  const [toasts, setToasts] = useState([]);
   const showToast = useCallback((message, type = 'info', icon = null) => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type, icon }]);
@@ -233,12 +239,6 @@ export default function App() {
   }, []);
 
   // FEATURE: Offline Indicator
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-
-  // FEATURE: Playback Speed
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
-
   // FEATURE: Listen History (separate from search history)
   const [listenHistory, setListenHistory] = useState(() => {
     try { return JSON.parse(localStorage.getItem('listenHistory') || '[]'); } catch { return []; }
@@ -1211,7 +1211,9 @@ export default function App() {
 
     // Immediately update backgroundAudio to keep session alive
     if (backgroundAudio && !useIframeFallback) {
-      backgroundAudio.src = `${streamEndpointBase}?videoId=${song.id}`;
+      const initialUrl = `${streamEndpointBase}?videoId=${song.id}`;
+      backgroundAudio.src = initialUrl;
+      lastAudioUrlRef.current = initialUrl;
       backgroundAudio.play().catch(() => {});
     }
 
@@ -1339,11 +1341,11 @@ export default function App() {
 
   // Mobile Background Playback & MediaSession API Logic
   const silentAudioRef = useRef(null);
-  const playNextRef = useRef(playNext);
-  const playPrevRef = useRef(playPrev);
-
-  playNextRef.current = playNext;
-  playPrevRef.current = playPrev;
+  // Sync refs for event handlers
+  useEffect(() => {
+    playNextRef.current = playNext;
+    playPrevRef.current = playPrev;
+  }, [playNext, playPrev]);
 
   const setupMediaSession = useCallback(() => {
     if ('mediaSession' in navigator && currentSong) {
@@ -1546,7 +1548,6 @@ export default function App() {
     }
   }, [playNext, useIframeFallback]);
 
-  const lastAudioUrlRef = useRef('');
   useEffect(() => {
     if (backgroundAudio && currentStreamUrl && !useIframeFallback) {
       if (lastAudioUrlRef.current !== currentStreamUrl) {
@@ -1554,20 +1555,13 @@ export default function App() {
         lastAudioUrlRef.current = currentStreamUrl;
         
         const savedProg = parseFloat(localStorage.getItem('savedProgress') || '0');
-        // If we are restoring from previous session without auto-playing
         if (!isPlaying && savedProg > 0) {
           backgroundAudio.currentTime = savedProg;
         }
       }
 
       if (isPlaying) {
-        backgroundAudio.play().catch(e => {
-          console.error("URL change play failed", e);
-          // Retry logic if blocked
-          if (e.name === 'NotAllowedError') {
-             // Browser blocked play(), show a hint or wait for next interaction
-          }
-        });
+        backgroundAudio.play().catch(() => {});
       }
     }
   }, [currentStreamUrl, useIframeFallback, isPlaying]);
@@ -1578,7 +1572,7 @@ export default function App() {
     <div className="flex items-center justify-center bg-black overflow-hidden font-['Outfit'] aurora-bg" style={{ height: '100dvh' }}>
 
       {/* Invisible HTML5 Audio to keep browser session alive for iOS/Android Background playing */}
-      <audio ref={silentAudioRef} loop playsInline src="https://github.com/anars/blank-audio/raw/master/10-seconds-of-silence.mp3" />
+      <audio ref={silentAudioRef} loop playsInline src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=" />
 
       {/* Native Audio Proxy & YouTube Player Fallback */}
       {currentSong && (
