@@ -1318,11 +1318,10 @@ export default function App() {
   };
 
 
-  const [directStreamUrl, setDirectStreamUrl] = useState(null);
-  const currentStreamUrl = directStreamUrl || (currentSong ? `${streamEndpointBase}?videoId=${currentSong.id}` : '');
+
 
   // Mobile Background Playback & MediaSession API Logic
-  const silentAudioRef = useRef(null);
+
   // Sync refs for event handlers
   useEffect(() => {
     playNextRef.current = playNext;
@@ -1425,8 +1424,6 @@ export default function App() {
     }
   }, [isPlaying, useIframeFallback]);
 
-  // Screen Wake Lock
-  const wakeLockRef = useRef(null);
   const requestWakeLock = useCallback(async () => {
     if ('wakeLock' in navigator && !wakeLockRef.current) {
       try {
