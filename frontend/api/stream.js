@@ -1,7 +1,7 @@
-const play = require('play-dl');
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+import play from 'play-dl';
+import ytStream from 'yt-stream';
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
     const { videoId } = req.query;
 
     if (!videoId) {
@@ -17,7 +17,7 @@ module.exports = async (req, res) => {
     }
 
     try {
-        // 1. Try play-dl (More stable than ytdl-core)
+        // 1. Try play-dl
         try {
             const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
             const info = await play.video_info(videoUrl);
@@ -26,11 +26,25 @@ module.exports = async (req, res) => {
             if (format?.url) {
                 return res.redirect(302, format.url);
             }
-        } catch (playError) {
-            console.warn('play-dl failed:', playError.message);
+        } catch (err) {
+            console.warn('play-dl failed');
         }
 
-        // 2. Try Piped API Fallback (from backend to avoid CORS)
+        // 2. Try yt-stream (already in package.json)
+        try {
+            const stream = await ytStream.getStream(videoId, {
+                quality: 'high',
+                type: 'audio',
+                highWaterMark: 1048576 * 32
+            });
+            if (stream?.url) {
+                return res.redirect(302, stream.url);
+            }
+        } catch (err) {
+            console.warn('yt-stream failed');
+        }
+
+        // 3. Try Piped API Fallback
         const pipedInstances = [
             'https://pipedapi.kavin.rocks',
             'https://api.piped.victr.me',
@@ -59,10 +73,10 @@ module.exports = async (req, res) => {
             }
         }
 
-        res.status(404).json({ error: 'Audio stream not found in any source' });
+        res.status(404).json({ error: 'All stream sources failed' });
 
     } catch (error) {
-        console.error('Streaming API Error:', error.message);
-        res.status(500).json({ error: 'Failed to fetch audio stream: ' + error.message });
+        console.error('Final Stream Error:', error.message);
+        res.status(500).json({ error: 'Stream fetch failed' });
     }
-};
+}
