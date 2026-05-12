@@ -1172,6 +1172,9 @@ export default function App() {
     }
   };
   const playSong = async (song, fromQueue = false) => {
+    setDirectStreamUrl(null); // Reset direct stream for new song
+    requestWakeLock(); // Request wake lock when starting playback
+    
     // Extract color for dynamic background
     getColorFromImage(song.thumbnail).then(color => setDominantColor(color));
 
@@ -1205,6 +1208,12 @@ export default function App() {
     setIsPlaying(true);
     setIsPlayerExpanded(true);
     setUseIframeFallback(false);
+
+    // Immediately update backgroundAudio to keep session alive
+    if (backgroundAudio && !useIframeFallback) {
+      backgroundAudio.src = `${streamEndpointBase}?videoId=${song.id}`;
+      backgroundAudio.play().catch(() => {});
+    }
 
     sessionPlayedIds.current.add(song.id);
     addPlayedTitleTokens(song.title);
@@ -1343,10 +1352,10 @@ export default function App() {
         artist: currentSong.artist || 'Unknown Artist',
         album: 'ISAI (இசை)',
         artwork: [
-          { src: '/logo.png', sizes: '96x96', type: 'image/png' },
-          { src: '/logo.png', sizes: '128x128', type: 'image/png' },
-          { src: '/logo.png', sizes: '256x256', type: 'image/png' },
-          { src: '/logo.png', sizes: '512x512', type: 'image/png' },
+          { src: currentSong.thumbnail || '/logo.png', sizes: '96x96', type: 'image/png' },
+          { src: currentSong.thumbnail || '/logo.png', sizes: '128x128', type: 'image/png' },
+          { src: currentSong.thumbnail || '/logo.png', sizes: '256x256', type: 'image/png' },
+          { src: currentSong.thumbnail || '/logo.png', sizes: '512x512', type: 'image/png' },
         ]
       });
 
@@ -1367,12 +1376,10 @@ export default function App() {
 
         navigator.mediaSession.setActionHandler('previoustrack', () => {
           if (playPrevRef.current) playPrevRef.current();
-          navigator.mediaSession.playbackState = 'playing';
         });
 
         navigator.mediaSession.setActionHandler('nexttrack', () => {
           if (playNextRef.current) playNextRef.current();
-          navigator.mediaSession.playbackState = 'playing';
         });
 
         navigator.mediaSession.setActionHandler('seekbackward', (details) => {
@@ -1411,7 +1418,7 @@ export default function App() {
         console.warn("MediaSession handlers failed:", e);
       }
     }
-  }, [currentSong, setIsPlaying]);
+  }, [currentSong, progress, duration]);
 
   useEffect(() => {
     setUseIframeFallback(false);
@@ -1434,12 +1441,24 @@ export default function App() {
     }
   }, [isPlaying, useIframeFallback]);
 
-  // Audio Context Unlock for Mobile
+  // Screen Wake Lock
+  const wakeLockRef = useRef(null);
+  const requestWakeLock = useCallback(async () => {
+    if ('wakeLock' in navigator && !wakeLockRef.current) {
+      try {
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+        wakeLockRef.current.onrelease = () => { wakeLockRef.current = null; };
+      } catch (err) { }
+    }
+  }, []);
+
+  // Audio Context Unlock for Mobile & Wake Lock
   useEffect(() => {
     const unlock = () => {
+      requestWakeLock();
       if (silentAudioRef.current) {
         silentAudioRef.current.play().then(() => {
-          silentAudioRef.current.pause();
+          if (!isPlaying) silentAudioRef.current.pause();
           window.removeEventListener('click', unlock);
           window.removeEventListener('touchstart', unlock);
         }).catch(() => { });
@@ -1451,7 +1470,22 @@ export default function App() {
       window.removeEventListener('click', unlock);
       window.removeEventListener('touchstart', unlock);
     };
-  }, []);
+  }, [isPlaying, requestWakeLock]);
+
+  // Handle visibility change to keep audio playing
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        requestWakeLock();
+        // If we were playing, ensure we still are
+        if (isPlaying && backgroundAudio && backgroundAudio.paused && !useIframeFallback) {
+          backgroundAudio.play().catch(() => { });
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isPlaying, useIframeFallback, requestWakeLock]);
 
   useEffect(() => {
     if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState || !currentSong || !duration) return;
@@ -1490,9 +1524,21 @@ export default function App() {
   // backgroundAudio setup and event handlers
   useEffect(() => {
     if (backgroundAudio) {
-      backgroundAudio.onended = () => playNext();
+      backgroundAudio.onended = () => {
+        // Keep audio context alive during transition
+        if (silentAudioRef.current) {
+          silentAudioRef.current.play().catch(() => { });
+        }
+        playNext();
+      };
       backgroundAudio.ontimeupdate = () => setProgress(backgroundAudio.currentTime);
       backgroundAudio.onloadeddata = () => setDuration(backgroundAudio.duration);
+      backgroundAudio.onplay = () => {
+        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+      };
+      backgroundAudio.onpause = () => {
+        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+      };
       backgroundAudio.onerror = (e) => {
         console.error("Audio player error:", e);
         if (!useIframeFallback) setUseIframeFallback(true);
@@ -1500,17 +1546,29 @@ export default function App() {
     }
   }, [playNext, useIframeFallback]);
 
+  const lastAudioUrlRef = useRef('');
   useEffect(() => {
     if (backgroundAudio && currentStreamUrl && !useIframeFallback) {
-      backgroundAudio.src = currentStreamUrl;
-      const savedProg = parseFloat(localStorage.getItem('savedProgress') || '0');
-
-      // If we are restoring from previous session without auto-playing
-      if (!isPlaying && savedProg > 0) {
-        backgroundAudio.currentTime = savedProg;
+      if (lastAudioUrlRef.current !== currentStreamUrl) {
+        backgroundAudio.src = currentStreamUrl;
+        lastAudioUrlRef.current = currentStreamUrl;
+        
+        const savedProg = parseFloat(localStorage.getItem('savedProgress') || '0');
+        // If we are restoring from previous session without auto-playing
+        if (!isPlaying && savedProg > 0) {
+          backgroundAudio.currentTime = savedProg;
+        }
       }
 
-      if (isPlaying) backgroundAudio.play().catch(e => console.error("URL change play failed", e));
+      if (isPlaying) {
+        backgroundAudio.play().catch(e => {
+          console.error("URL change play failed", e);
+          // Retry logic if blocked
+          if (e.name === 'NotAllowedError') {
+             // Browser blocked play(), show a hint or wait for next interaction
+          }
+        });
+      }
     }
   }, [currentStreamUrl, useIframeFallback, isPlaying]);
 
@@ -1520,7 +1578,7 @@ export default function App() {
     <div className="flex items-center justify-center bg-black overflow-hidden font-['Outfit'] aurora-bg" style={{ height: '100dvh' }}>
 
       {/* Invisible HTML5 Audio to keep browser session alive for iOS/Android Background playing */}
-      <audio ref={silentAudioRef} loop playsInline src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=" />
+      <audio ref={silentAudioRef} loop playsInline src="https://github.com/anars/blank-audio/raw/master/10-seconds-of-silence.mp3" />
 
       {/* Native Audio Proxy & YouTube Player Fallback */}
       {currentSong && (
