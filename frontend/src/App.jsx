@@ -62,8 +62,7 @@ if (backgroundAudio) {
   backgroundAudio.id = "play-infinity-core-audio";
   backgroundAudio.style.display = 'none';
   backgroundAudio.setAttribute('playsinline', 'true');
-  // Disabled crossOrigin to ensure reliable playback; visualizer will use fallback mode
-  // backgroundAudio.crossOrigin = "anonymous"; 
+  backgroundAudio.crossOrigin = "anonymous"; // CRITICAL for Equalizer analysis
 }
 
 const DesktopSongRow = React.memo(function DesktopSongRow({
@@ -93,13 +92,8 @@ const DesktopSongRow = React.memo(function DesktopSongRow({
   );
 });
 
-const cleanTitle = (raw = '') => {
-  return raw
-    .replace(/\s*[|\-–—•·]\s*(official|lyric|lyrics|video|audio|song|songs|hd|hq|4k|8k|full|feat\.?|ft\.?|starring|music video|video song|audio song|tamil song|tamil|whatsapp status|status|remaster|remastered|\d{4})[^|\-–—•·]*/gi, '')
-    .replace(/\s*\([^)]{0,40}(official|lyric|audio|hd|remaster|\d{4})[^)]*\)/gi, '')
-    .replace(/\s*\[[^\]]{0,40}(official|lyric|audio|hd|remaster|\d{4})[^\]]*\]/gi, '')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
+const cleanTitle = (title = '') => {
+  return title.replace(/\s*\[[^\]]*\]|\([^)]*\)\s*/g, '').replace(/official|video|audio|lyric|lyrics/gi, '').trim();
 };
 
 const GENRE_CHIPS = [
@@ -118,31 +112,18 @@ export default function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [queue, setQueue] = useState([]);
   const [isFetchingQueue, setIsFetchingQueue] = useState(false);
+  const playerRef = useRef(null);
+  const sessionPlayedIds = useRef(new Set());
+  const playedTitleTokenSetsRef = useRef([]);
+  // Stack of songs played — for the ⏮ Previous button to navigate back
+  const playHistoryStack = useRef([]);
   const [trendingSongs, setTrendingSongs] = useState([]);
-  const [directStreamUrl, setDirectStreamUrl] = useState(null);
-  const [activeTab, setActiveTab] = useState('Home');
-  const [isPlayerExpanded, setIsPlayerExpanded] = useState(false);
-  const [dominantColor, setDominantColor] = useState('#8cd92b');
-  const [audioData, setAudioData] = useState(new Uint8Array(32).fill(0));
-  const [toasts, setToasts] = useState([]);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
-  const [sleepTimer, setSleepTimer] = useState(null);
-  const [sleepMinutesLeft, setSleepMinutesLeft] = useState(0);
-  const [showSleepModal, setShowSleepModal] = useState(false);
-  const [isLyricsVisible, setIsLyricsVisible] = useState(false);
-  const [visualizerMode, setVisualizerMode] = useState(0); // 0=Equalizer, 1=Halo Only, 2=Off
-  const [showShareCard, setShowShareCard] = useState(false);
-  const [showPlaylistModal, setShowPlaylistModal] = useState({ isOpen: false, songInfo: null });
-  const [newPlaylistName, setNewPlaylistName] = useState('');
-  const [currentViewPlaylist, setCurrentViewPlaylist] = useState(null);
-  const [showSongOptions, setShowSongOptions] = useState(null);
-  const [activeCategory, setActiveCategory] = useState('All');
+
 
   const [searchHistory, setSearchHistory] = useState(() => {
     try {
@@ -173,26 +154,25 @@ export default function App() {
     }
   });
 
-  const playerRef = useRef(null);
-  const sessionPlayedIds = useRef(new Set());
-  const playedTitleTokenSetsRef = useRef([]);
-  const playHistoryStack = useRef([]);
+  const [showPlaylistModal, setShowPlaylistModal] = useState({ isOpen: false, songInfo: null });
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [currentViewPlaylist, setCurrentViewPlaylist] = useState(null);
+  const [activeTab, setActiveTab] = useState('Home');
+  const [isPlayerExpanded, setIsPlayerExpanded] = useState(false);
+  const [showSongOptions, setShowSongOptions] = useState(null);
+  const [activeCategory, setActiveCategory] = useState('All');
+
+  // Additional feature states
+  const [sleepTimer, setSleepTimer] = useState(null);
+  const [sleepMinutesLeft, setSleepMinutesLeft] = useState(0);
+  const [showSleepModal, setShowSleepModal] = useState(false);
+  const [isLyricsVisible, setIsLyricsVisible] = useState(false);
   const sleepTimerRef = useRef(null);
+
+  // PREMIUM INTERACTIVE FEATURES (Insta Story, Swipe, Profile, Visualizer)
+  const [visualizerMode, setVisualizerMode] = useState(0); // 0=Equalizer, 1=Halo Only, 2=Off
+  const [showShareCard, setShowShareCard] = useState(false);
   const shareCardRef = useRef(null);
-  const analyserRef = useRef(null);
-  const audioCtxRef = useRef(null);
-  const sourceRef = useRef(null);
-  const silentAudioRef = useRef(null);
-  const lastAudioUrlRef = useRef('');
-  const wakeLockRef = useRef(null);
-  const swipeTouchStartX = useRef(null);
-  const swipeTouchStartY = useRef(null);
-  const playNextRef = useRef(null);
-  const playPrevRef = useRef(null);
-
-  const streamEndpointBase = 'https://play-infinity.vercel.app/api/stream';
-  const currentStreamUrl = directStreamUrl || (currentSong ? `${streamEndpointBase}?videoId=${currentSong.id}` : '');
-
   const favoriteIds = useMemo(() => new Set(favorites.map(s => s.id)), [favorites]);
   const fallbackSongs = useMemo(() => {
     if (songs.length > 0) return songs;
@@ -237,7 +217,15 @@ export default function App() {
     }
   };
 
+  // FEATURE: Dynamic UI & Audio Visualizer
+  const [dominantColor, setDominantColor] = useState('#8cd92b');
+  const [audioData, setAudioData] = useState(new Uint8Array(32).fill(0));
+  const analyserRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const sourceRef = useRef(null);
+
   // FEATURE: Toast Notifications
+  const [toasts, setToasts] = useState([]);
   const showToast = useCallback((message, type = 'info', icon = null) => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type, icon }]);
@@ -245,6 +233,12 @@ export default function App() {
   }, []);
 
   // FEATURE: Offline Indicator
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  // FEATURE: Playback Speed
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+
   // FEATURE: Listen History (separate from search history)
   const [listenHistory, setListenHistory] = useState(() => {
     try { return JSON.parse(localStorage.getItem('listenHistory') || '[]'); } catch { return []; }
@@ -885,7 +879,30 @@ export default function App() {
     fetchTrending();
   }, []);
 
+  // ── CLEAN TITLE: Strip YouTube junk from song titles ─────────────────────
+  const cleanTitle = (raw = '') => {
+    return raw
+      .replace(/\s*[|\-–—•·]\s*(official|lyric|lyrics|video|audio|song|songs|hd|hq|4k|8k|full|feat\.?|ft\.?|starring|music video|video song|audio song|tamil song|tamil|whatsapp status|status|remaster|remastered|\d{4})[^|\-–—•·]*/gi, '')
+      .replace(/\s*\([^)]{0,40}(official|lyric|audio|hd|remaster|\d{4})[^)]*\)/gi, '')
+      .replace(/\s*\[[^\]]{0,40}(official|lyric|audio|hd|remaster|\d{4})[^\]]*\]/gi, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  };
 
+  // ── QUICK GENRE SEARCH ────────────────────────────────────────────────────
+  const GENRE_CHIPS = [
+    { label: '💪 Motivation', query: 'tamil motivational inspiring workout energetic songs' },
+    { label: '💃 Kuthu', query: 'tamil kuthu mass dance songs' },
+    { label: '❤️ Love', query: 'tamil love melody romantic songs' },
+    { label: '😢 Sad', query: 'tamil sad feeling songs' },
+    { label: '🔥 Trending', query: 'Anirudh 2024 2025 tamil trending songs' },
+    { label: '🎸 Anirudh', query: 'Anirudh Ravichander tamil hit songs' },
+    { label: '🎹 Rahman', query: 'AR Rahman evergreen tamil songs' },
+    { label: '🎻 Harris', query: 'Harris Jayaraj tamil melody songs' },
+    { label: '🎵 Yuvan', query: 'Yuvan Shankar Raja tamil hit songs' },
+    { label: '📻 Classic', query: 'Ilaiyaraaja classic 80s 90s tamil songs' },
+    { label: '🎤 Sid', query: 'Sid Sriram tamil songs' },
+  ];
 
   const searchYoutube = async (e, overrideQuery) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -1115,13 +1132,46 @@ export default function App() {
 
 
 
+  const streamEndpointBase = 'https://play-infinity.vercel.app/api/stream';
 
+  // List of public Piped instances as backbridge for background play
+  const pipedInstances = [
+    'https://pipedapi.kavin.rocks',
+    'https://api.piped.victr.me',
+    'https://piped-api.lunar.icu',
+    'https://pipedapi.metafates.me',
+    'https://api-piped.mha.fi',
+    'https://pipedapi.drgns.space',
+    'https://pipedapi.synced.cloud'
+  ];
 
+  const fetchPipedStream = async (videoId) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
+    const fetchInstance = async (instance) => {
+      const response = await fetch(`${instance}/streams/${videoId}`, { signal: controller.signal });
+      if (!response.ok) throw new Error('Fail');
+      const data = await response.json();
+      const audioStreams = data.audioStreams || [];
+      const bestAudio = audioStreams
+        .filter(s => s.mimeType.includes('audio/mp4'))
+        .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0] || audioStreams[0];
+      if (bestAudio?.url) return bestAudio.url;
+      throw new Error('No audio');
+    };
+
+    try {
+      const result = await Promise.any(pipedInstances.map(instance => fetchInstance(instance)));
+      clearTimeout(timeoutId);
+      return result;
+    } catch (e) {
+      console.warn("All Piped instances failed or timed out", e);
+      clearTimeout(timeoutId);
+      return null;
+    }
+  };
   const playSong = async (song, fromQueue = false) => {
-    setDirectStreamUrl(null); // Reset direct stream for new song
-    requestWakeLock(); // Request wake lock when starting playback
-    
     // Extract color for dynamic background
     getColorFromImage(song.thumbnail).then(color => setDominantColor(color));
 
@@ -1156,14 +1206,6 @@ export default function App() {
     setIsPlayerExpanded(true);
     setUseIframeFallback(false);
 
-    // Immediately update backgroundAudio to keep session alive
-    if (backgroundAudio && !useIframeFallback) {
-      const initialUrl = `${streamEndpointBase}?videoId=${song.id}`;
-      backgroundAudio.src = initialUrl;
-      lastAudioUrlRef.current = initialUrl;
-      backgroundAudio.play().catch(() => {});
-    }
-
     sessionPlayedIds.current.add(song.id);
     addPlayedTitleTokens(song.title);
 
@@ -1194,6 +1236,13 @@ export default function App() {
       if (queue.length <= 15) {
         fetchQueue(song);
       }
+    }
+
+    const directUrl = await fetchPipedStream(song.id);
+    if (directUrl) {
+      setDirectStreamUrl(directUrl);
+    } else {
+      setDirectStreamUrl(null);
     }
   };
 
@@ -1276,15 +1325,16 @@ export default function App() {
   };
 
 
-
+  const [directStreamUrl, setDirectStreamUrl] = useState(null);
+  const currentStreamUrl = directStreamUrl || (currentSong ? `${streamEndpointBase}?videoId=${currentSong.id}` : '');
 
   // Mobile Background Playback & MediaSession API Logic
+  const silentAudioRef = useRef(null);
+  const playNextRef = useRef(playNext);
+  const playPrevRef = useRef(playPrev);
 
-  // Sync refs for event handlers
-  useEffect(() => {
-    playNextRef.current = playNext;
-    playPrevRef.current = playPrev;
-  }, [playNext, playPrev]);
+  playNextRef.current = playNext;
+  playPrevRef.current = playPrev;
 
   const setupMediaSession = useCallback(() => {
     if ('mediaSession' in navigator && currentSong) {
@@ -1293,10 +1343,10 @@ export default function App() {
         artist: currentSong.artist || 'Unknown Artist',
         album: 'ISAI (இசை)',
         artwork: [
-          { src: currentSong.thumbnail || '/logo.png', sizes: '96x96', type: 'image/png' },
-          { src: currentSong.thumbnail || '/logo.png', sizes: '128x128', type: 'image/png' },
-          { src: currentSong.thumbnail || '/logo.png', sizes: '256x256', type: 'image/png' },
-          { src: currentSong.thumbnail || '/logo.png', sizes: '512x512', type: 'image/png' },
+          { src: '/logo.png', sizes: '96x96', type: 'image/png' },
+          { src: '/logo.png', sizes: '128x128', type: 'image/png' },
+          { src: '/logo.png', sizes: '256x256', type: 'image/png' },
+          { src: '/logo.png', sizes: '512x512', type: 'image/png' },
         ]
       });
 
@@ -1317,10 +1367,12 @@ export default function App() {
 
         navigator.mediaSession.setActionHandler('previoustrack', () => {
           if (playPrevRef.current) playPrevRef.current();
+          navigator.mediaSession.playbackState = 'playing';
         });
 
         navigator.mediaSession.setActionHandler('nexttrack', () => {
           if (playNextRef.current) playNextRef.current();
+          navigator.mediaSession.playbackState = 'playing';
         });
 
         navigator.mediaSession.setActionHandler('seekbackward', (details) => {
@@ -1359,7 +1411,7 @@ export default function App() {
         console.warn("MediaSession handlers failed:", e);
       }
     }
-  }, [currentSong, progress, duration]);
+  }, [currentSong, setIsPlaying]);
 
   useEffect(() => {
     setUseIframeFallback(false);
@@ -1382,22 +1434,12 @@ export default function App() {
     }
   }, [isPlaying, useIframeFallback]);
 
-  const requestWakeLock = useCallback(async () => {
-    if ('wakeLock' in navigator && !wakeLockRef.current) {
-      try {
-        wakeLockRef.current = await navigator.wakeLock.request('screen');
-        wakeLockRef.current.onrelease = () => { wakeLockRef.current = null; };
-      } catch (err) { }
-    }
-  }, []);
-
-  // Audio Context Unlock for Mobile & Wake Lock
+  // Audio Context Unlock for Mobile
   useEffect(() => {
     const unlock = () => {
-      requestWakeLock();
       if (silentAudioRef.current) {
         silentAudioRef.current.play().then(() => {
-          if (!isPlaying) silentAudioRef.current.pause();
+          silentAudioRef.current.pause();
           window.removeEventListener('click', unlock);
           window.removeEventListener('touchstart', unlock);
         }).catch(() => { });
@@ -1409,22 +1451,7 @@ export default function App() {
       window.removeEventListener('click', unlock);
       window.removeEventListener('touchstart', unlock);
     };
-  }, [isPlaying, requestWakeLock]);
-
-  // Handle visibility change to keep audio playing
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        requestWakeLock();
-        // If we were playing, ensure we still are
-        if (isPlaying && backgroundAudio && backgroundAudio.paused && !useIframeFallback) {
-          backgroundAudio.play().catch(() => { });
-        }
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [isPlaying, useIframeFallback, requestWakeLock]);
+  }, []);
 
   useEffect(() => {
     if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState || !currentSong || !duration) return;
@@ -1457,25 +1484,15 @@ export default function App() {
   }, [currentSong, progress, duration]);
 
   // FEATURE: Swipe gestures on Now Playing
+  const swipeTouchStartX = useRef(null);
+  const swipeTouchStartY = useRef(null);
 
   // backgroundAudio setup and event handlers
   useEffect(() => {
     if (backgroundAudio) {
-      backgroundAudio.onended = () => {
-        // Keep audio context alive during transition
-        if (silentAudioRef.current) {
-          silentAudioRef.current.play().catch(() => { });
-        }
-        playNext();
-      };
+      backgroundAudio.onended = () => playNext();
       backgroundAudio.ontimeupdate = () => setProgress(backgroundAudio.currentTime);
       backgroundAudio.onloadeddata = () => setDuration(backgroundAudio.duration);
-      backgroundAudio.onplay = () => {
-        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
-      };
-      backgroundAudio.onpause = () => {
-        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
-      };
       backgroundAudio.onerror = (e) => {
         console.error("Audio player error:", e);
         if (!useIframeFallback) setUseIframeFallback(true);
@@ -1485,19 +1502,15 @@ export default function App() {
 
   useEffect(() => {
     if (backgroundAudio && currentStreamUrl && !useIframeFallback) {
-      if (lastAudioUrlRef.current !== currentStreamUrl) {
-        backgroundAudio.src = currentStreamUrl;
-        lastAudioUrlRef.current = currentStreamUrl;
-        
-        const savedProg = parseFloat(localStorage.getItem('savedProgress') || '0');
-        if (!isPlaying && savedProg > 0) {
-          backgroundAudio.currentTime = savedProg;
-        }
+      backgroundAudio.src = currentStreamUrl;
+      const savedProg = parseFloat(localStorage.getItem('savedProgress') || '0');
+
+      // If we are restoring from previous session without auto-playing
+      if (!isPlaying && savedProg > 0) {
+        backgroundAudio.currentTime = savedProg;
       }
 
-      if (isPlaying) {
-        backgroundAudio.play().catch(() => {});
-      }
+      if (isPlaying) backgroundAudio.play().catch(e => console.error("URL change play failed", e));
     }
   }, [currentStreamUrl, useIframeFallback, isPlaying]);
 
