@@ -118,6 +118,7 @@ export default function App() {
   const [queue, setQueue] = useState([]);
   const [isFetchingQueue, setIsFetchingQueue] = useState(false);
   const playerRef = useRef(null);
+  const currentSongIdRef = useRef(null);
   const sessionPlayedIds = useRef(new Set());
   const playedTitleTokenSetsRef = useRef([]);
   // Stack of songs played — for the ⏮ Previous button to navigate back
@@ -1200,11 +1201,17 @@ export default function App() {
       console.warn("Audio visualization setup failed:", err);
     }
 
+    if (backgroundAudio) {
+      backgroundAudio.pause();
+      backgroundAudio.currentTime = 0;
+    }
+    currentSongIdRef.current = song.id;
     setProgress(0);
     setCurrentSong(song);
     setIsPlaying(true);
     setIsPlayerExpanded(true);
     setUseIframeFallback(false);
+    setDirectStreamUrl(null);
 
     sessionPlayedIds.current.add(song.id);
     addPlayedTitleTokens(song.title);
@@ -1238,12 +1245,16 @@ export default function App() {
       }
     }
 
-    const directUrl = await fetchPipedStream(song.id);
-    if (directUrl) {
-      setDirectStreamUrl(directUrl);
-    } else {
-      setDirectStreamUrl(null);
-    }
+    fetchPipedStream(song.id).then(directUrl => {
+      // Only set if we are still playing the same song
+      if (directUrl && currentSongIdRef.current === song.id) {
+        setDirectStreamUrl(directUrl);
+      }
+    }).catch(() => {
+      if (currentSongIdRef.current === song.id) {
+        setDirectStreamUrl(null);
+      }
+    });
   };
 
   const togglePlay = () => {
@@ -1444,6 +1455,11 @@ export default function App() {
           window.removeEventListener('touchstart', unlock);
         }).catch(() => { });
       }
+      if (backgroundAudio) {
+        backgroundAudio.play().then(() => {
+          backgroundAudio.pause();
+        }).catch(() => { });
+      }
     };
     window.addEventListener('click', unlock);
     window.addEventListener('touchstart', unlock);
@@ -1502,15 +1518,24 @@ export default function App() {
 
   useEffect(() => {
     if (backgroundAudio && currentStreamUrl && !useIframeFallback) {
+      const currentPos = backgroundAudio.currentTime;
       backgroundAudio.src = currentStreamUrl;
       const savedProg = parseFloat(localStorage.getItem('savedProgress') || '0');
 
       // If we are restoring from previous session without auto-playing
       if (!isPlaying && savedProg > 0) {
         backgroundAudio.currentTime = savedProg;
+      } else if (isPlaying && currentPos > 0) {
+        // Stream URL upgraded mid-playback, seamlessly continue
+        backgroundAudio.currentTime = currentPos;
       }
 
-      if (isPlaying) backgroundAudio.play().catch(e => console.error("URL change play failed", e));
+      if (isPlaying) {
+        backgroundAudio.play().catch(e => {
+          console.error("URL change play failed", e);
+          if (!useIframeFallback) setUseIframeFallback(true);
+        });
+      }
     }
   }, [currentStreamUrl, useIframeFallback, isPlaying]);
 
