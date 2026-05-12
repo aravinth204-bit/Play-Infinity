@@ -1140,10 +1140,14 @@ export default function App() {
     'https://pipedapi.kavin.rocks',
     'https://api.piped.victr.me',
     'https://piped-api.lunar.icu',
-    'https://pipedapi.metafates.me',
     'https://api-piped.mha.fi',
     'https://pipedapi.drgns.space',
-    'https://pipedapi.synced.cloud'
+    'https://pipedapi.synced.cloud',
+    'https://pipedapi.nexus.rocks',
+    'https://pipedapi.leptons.xyz',
+    'https://pipedapi.moom.beat.com',
+    'https://pipedapi.ducks.md',
+    'https://pipedapi.ramat.rocks'
   ];
 
   const fetchPipedStream = async (videoId) => {
@@ -1203,11 +1207,9 @@ export default function App() {
 
     if (backgroundAudio) {
       backgroundAudio.pause();
-      backgroundAudio.currentTime = 0;
-      // CRITICAL: Set source and play immediately to ensure background play permission
-      const proxyUrl = `${streamEndpointBase}?videoId=${song.id}`;
-      backgroundAudio.src = proxyUrl;
-      backgroundAudio.play().catch(e => console.warn("Background play start:", e));
+      // Use silent base64 to 'unlock' the element for background play
+      backgroundAudio.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+      backgroundAudio.play().catch(e => console.warn("Background audio unlock start:", e));
       if (silentAudioRef.current) silentAudioRef.current.play().catch(() => {});
     }
 
@@ -1531,23 +1533,30 @@ export default function App() {
       const currentPos = backgroundAudio.currentTime;
       
       // Only set src if it's actually different to avoid unnecessary reloads
+      // We also check if current src is the 'silence' unlocker
       const absoluteUrl = new URL(currentStreamUrl, window.location.href).href;
-      if (backgroundAudio.src !== absoluteUrl) {
+      const isSilence = backgroundAudio.src.startsWith('data:audio/wav;base64');
+
+      if (backgroundAudio.src !== absoluteUrl || isSilence) {
         backgroundAudio.src = currentStreamUrl;
         const savedProg = parseFloat(localStorage.getItem('savedProgress') || '0');
 
         // If we are restoring from previous session without auto-playing
         if (!isPlaying && savedProg > 0) {
           backgroundAudio.currentTime = savedProg;
-        } else if (isPlaying && currentPos > 0) {
+        } else if (isPlaying && currentPos > 0 && !isSilence) {
           // Stream URL upgraded mid-playback, seamlessly continue
           backgroundAudio.currentTime = currentPos;
+        } else if (isSilence) {
+          // Reset to start after silence unlock
+          backgroundAudio.currentTime = 0;
         }
       }
 
       if (isPlaying) {
         backgroundAudio.play().catch(e => {
           console.error("URL change play failed", e);
+          // If the URL fails, try to fallback to iframe
           if (!useIframeFallback) setUseIframeFallback(true);
         });
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
