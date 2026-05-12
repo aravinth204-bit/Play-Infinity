@@ -1114,7 +1114,7 @@ export default function App() {
 
 
 
-  const streamEndpointBase = 'https://play-infinity.vercel.app/api/stream';
+
 
   // List of public Piped instances as backbridge for background play
   const pipedInstances = [
