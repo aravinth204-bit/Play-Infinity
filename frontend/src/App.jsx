@@ -62,7 +62,8 @@ if (backgroundAudio) {
   backgroundAudio.id = "play-infinity-core-audio";
   backgroundAudio.style.display = 'none';
   backgroundAudio.setAttribute('playsinline', 'true');
-  backgroundAudio.crossOrigin = "anonymous"; // CRITICAL for Equalizer analysis
+  // Disabled crossOrigin to ensure reliable playback; visualizer will use fallback mode
+  // backgroundAudio.crossOrigin = "anonymous"; 
 }
 
 const DesktopSongRow = React.memo(function DesktopSongRow({
@@ -1116,43 +1117,7 @@ export default function App() {
 
 
 
-  // List of public Piped instances as backbridge for background play
-  const pipedInstances = [
-    'https://pipedapi.kavin.rocks',
-    'https://api.piped.victr.me',
-    'https://piped-api.lunar.icu',
-    'https://pipedapi.metafates.me',
-    'https://api-piped.mha.fi',
-    'https://pipedapi.drgns.space',
-    'https://pipedapi.synced.cloud'
-  ];
 
-  const fetchPipedStream = async (videoId) => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
-
-    const fetchInstance = async (instance) => {
-      const response = await fetch(`${instance}/streams/${videoId}`, { signal: controller.signal });
-      if (!response.ok) throw new Error('Fail');
-      const data = await response.json();
-      const audioStreams = data.audioStreams || [];
-      const bestAudio = audioStreams
-        .filter(s => s.mimeType.includes('audio/mp4'))
-        .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0] || audioStreams[0];
-      if (bestAudio?.url) return bestAudio.url;
-      throw new Error('No audio');
-    };
-
-    try {
-      const result = await Promise.any(pipedInstances.map(instance => fetchInstance(instance)));
-      clearTimeout(timeoutId);
-      return result;
-    } catch (e) {
-      console.warn("All Piped instances failed or timed out", e);
-      clearTimeout(timeoutId);
-      return null;
-    }
-  };
   const playSong = async (song, fromQueue = false) => {
     setDirectStreamUrl(null); // Reset direct stream for new song
     requestWakeLock(); // Request wake lock when starting playback
@@ -1229,13 +1194,6 @@ export default function App() {
       if (queue.length <= 15) {
         fetchQueue(song);
       }
-    }
-
-    const directUrl = await fetchPipedStream(song.id);
-    if (directUrl) {
-      setDirectStreamUrl(directUrl);
-    } else {
-      setDirectStreamUrl(null);
     }
   };
 
