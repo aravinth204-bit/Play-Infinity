@@ -1,5 +1,6 @@
 import play from 'play-dl';
 import ytStream from 'yt-stream';
+import ytdl from '@distube/ytdl-core';
 
 export default async function handler(req, res) {
     const { videoId } = req.query;
@@ -26,11 +27,18 @@ export default async function handler(req, res) {
             if (format?.url) {
                 return res.redirect(302, format.url);
             }
-        } catch (err) {
-            console.warn('play-dl failed');
-        }
+        } catch (err) {}
 
-        // 2. Try yt-stream (already in package.json)
+        // 2. Try ytdl-core (Distube version is more active)
+        try {
+            const info = await ytdl.getInfo(videoId);
+            const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio', filter: 'audioonly' });
+            if (format?.url) {
+                return res.redirect(302, format.url);
+            }
+        } catch (err) {}
+
+        // 3. Try yt-stream
         try {
             const stream = await ytStream.getStream(videoId, {
                 quality: 'high',
@@ -40,23 +48,23 @@ export default async function handler(req, res) {
             if (stream?.url) {
                 return res.redirect(302, stream.url);
             }
-        } catch (err) {
-            console.warn('yt-stream failed');
-        }
+        } catch (err) {}
 
-        // 3. Try Piped API Fallback
+        // 4. Try Piped API Fallback (Extensive list)
         const pipedInstances = [
             'https://pipedapi.kavin.rocks',
             'https://api.piped.victr.me',
-            'https://piped-api.lunar.icu',
             'https://pipedapi.metafates.me',
+            'https://pipedapi.drgns.space',
             'https://api-piped.mha.fi',
-            'https://pipedapi.drgns.space'
+            'https://piped-api.lunar.icu',
+            'https://pipedapi.rivo.cc',
+            'https://pipedapi.adminforge.de'
         ];
 
         for (const instance of pipedInstances) {
             try {
-                const response = await fetch(`${instance}/streams/${videoId}`);
+                const response = await fetch(`${instance}/streams/${videoId}`, { signal: AbortSignal.timeout(3000) });
                 if (response.ok) {
                     const data = await response.json();
                     const audioStreams = data.audioStreams || [];
@@ -73,10 +81,37 @@ export default async function handler(req, res) {
             }
         }
 
-        res.status(404).json({ error: 'All stream sources failed' });
+        // 5. Try Invidious Fallback
+        const invidiousInstances = [
+            'https://invidious.snopyta.org',
+            'https://yewtu.be',
+            'https://invidious.kavin.rocks',
+            'https://invidious.sethforprivacy.com'
+        ];
+
+        for (const instance of invidiousInstances) {
+            try {
+                const response = await fetch(`${instance}/api/v1/videos/${videoId}`, { signal: AbortSignal.timeout(3000) });
+                if (response.ok) {
+                    const data = await response.json();
+                    const adaptiveFormats = data.adaptiveFormats || [];
+                    const bestAudio = adaptiveFormats
+                        .filter(f => f.type.includes('audio/mp4'))
+                        .sort((a, b) => (parseInt(b.bitrate) || 0) - (parseInt(a.bitrate) || 0))[0];
+                    
+                    if (bestAudio?.url) {
+                        return res.redirect(302, bestAudio.url);
+                    }
+                }
+            } catch (err) {
+                continue;
+            }
+        }
+
+        res.status(404).send('Audio not found in any source');
 
     } catch (error) {
         console.error('Final Stream Error:', error.message);
-        res.status(500).json({ error: 'Stream fetch failed' });
+        res.status(500).send('Stream fetch failed');
     }
 }
