@@ -1214,6 +1214,7 @@ export default function App() {
     currentSongIdRef.current = song.id;
     setProgress(0);
     setCurrentSong(song);
+    setupMediaSession(song); // CRITICAL: Update lock screen notification IMMEDIATELY
     setIsPlaying(true);
     setIsPlayerExpanded(true);
     setUseIframeFallback(false);
@@ -1353,17 +1354,18 @@ export default function App() {
   playNextRef.current = playNext;
   playPrevRef.current = playPrev;
 
-  const setupMediaSession = useCallback(() => {
-    if ('mediaSession' in navigator && currentSong) {
+  const setupMediaSession = useCallback((songOverride) => {
+    const song = songOverride || currentSong;
+    if ('mediaSession' in navigator && song) {
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: currentSong.title,
-        artist: currentSong.artist || 'Unknown Artist',
+        title: song.title,
+        artist: song.artist || 'Unknown Artist',
         album: 'ISAI (இசை)',
         artwork: [
-          { src: '/logo.png', sizes: '96x96', type: 'image/png' },
-          { src: '/logo.png', sizes: '128x128', type: 'image/png' },
-          { src: '/logo.png', sizes: '256x256', type: 'image/png' },
-          { src: '/logo.png', sizes: '512x512', type: 'image/png' },
+          { src: song.thumbnail, sizes: '96x96', type: 'image/jpeg' },
+          { src: song.thumbnail, sizes: '128x128', type: 'image/jpeg' },
+          { src: song.thumbnail, sizes: '256x256', type: 'image/jpeg' },
+          { src: song.thumbnail, sizes: '512x512', type: 'image/jpeg' },
         ]
       });
 
@@ -1371,14 +1373,14 @@ export default function App() {
         navigator.mediaSession.setActionHandler('play', () => {
           setIsPlaying(true);
           if (backgroundAudio) backgroundAudio.play().catch(() => { });
-          silentAudioRef.current?.play().catch(() => { });
+          if (silentAudioRef.current) silentAudioRef.current.play().catch(() => { });
           navigator.mediaSession.playbackState = 'playing';
         });
 
         navigator.mediaSession.setActionHandler('pause', () => {
           setIsPlaying(false);
           if (backgroundAudio) backgroundAudio.pause();
-          silentAudioRef.current?.pause();
+          if (silentAudioRef.current) silentAudioRef.current.pause();
           navigator.mediaSession.playbackState = 'paused';
         });
 
@@ -1421,14 +1423,14 @@ export default function App() {
         navigator.mediaSession.setActionHandler('stop', () => {
           setIsPlaying(false);
           if (backgroundAudio) backgroundAudio.pause();
-          silentAudioRef.current?.pause();
+          if (silentAudioRef.current) silentAudioRef.current.pause();
           navigator.mediaSession.playbackState = 'none';
         });
       } catch (e) {
         console.warn("MediaSession handlers failed:", e);
       }
     }
-  }, [currentSong, setIsPlaying]);
+  }, [currentSong, setIsPlaying, duration, progress]);
 
   useEffect(() => {
     setUseIframeFallback(false);
