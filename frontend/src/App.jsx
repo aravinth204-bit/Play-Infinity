@@ -1172,7 +1172,7 @@ export default function App() {
       return null;
     }
   };
-  const playSong = async (song, fromQueue = false) => {
+  const playSong = useCallback(async (song, fromQueue = false) => {
     // Extract color for dynamic background
     getColorFromImage(song.thumbnail).then(color => setDominantColor(color));
 
@@ -1204,7 +1204,13 @@ export default function App() {
     if (backgroundAudio) {
       backgroundAudio.pause();
       backgroundAudio.currentTime = 0;
+      // CRITICAL: Set source and play immediately to ensure background play permission
+      const proxyUrl = `${streamEndpointBase}?videoId=${song.id}`;
+      backgroundAudio.src = proxyUrl;
+      backgroundAudio.play().catch(e => console.warn("Background play start:", e));
+      if (silentAudioRef.current) silentAudioRef.current.play().catch(() => {});
     }
+
     currentSongIdRef.current = song.id;
     setProgress(0);
     setCurrentSong(song);
@@ -1255,7 +1261,7 @@ export default function App() {
         setDirectStreamUrl(null);
       }
     });
-  };
+  }, [currentSong, queue, isFetchingQueue, fallbackSongs, streamEndpointBase]);
 
   const togglePlay = () => {
     if (!currentSong) return;
@@ -1296,7 +1302,7 @@ export default function App() {
     playerRef.current.seekTo(value, "seconds");
   };
 
-  const playNext = () => {
+  const playNext = useCallback(() => {
     if (queue.length > 0) {
       playSong(queue[0], true);
     } else if (isFetchingQueue) {
@@ -1309,9 +1315,9 @@ export default function App() {
         playSong(fallbackSongs[0]); // loop back
       }
     }
-  };
+  }, [queue, isFetchingQueue, fallbackSongs, currentSong, playSong]);
 
-  const playPrev = () => {
+  const playPrev = useCallback(() => {
     // Pop from the play history stack to go back to the previous song
     if (playHistoryStack.current.length > 0) {
       // Peek first — skip any duplicate of current song at top of stack
@@ -1333,7 +1339,7 @@ export default function App() {
     const pool = [...songs, ...trendingSongs];
     const idx = pool.findIndex(s => s.id === currentSong?.id);
     if (idx > 0) playSong(pool[idx - 1]);
-  };
+  }, [currentSong, songs, trendingSongs, playSong]);
 
 
   const [directStreamUrl, setDirectStreamUrl] = useState(null);
@@ -1506,7 +1512,9 @@ export default function App() {
   // backgroundAudio setup and event handlers
   useEffect(() => {
     if (backgroundAudio) {
-      backgroundAudio.onended = () => playNext();
+      backgroundAudio.onended = () => {
+        if (playNextRef.current) playNextRef.current();
+      };
       backgroundAudio.ontimeupdate = () => setProgress(backgroundAudio.currentTime);
       backgroundAudio.onloadeddata = () => setDuration(backgroundAudio.duration);
       backgroundAudio.onerror = (e) => {
@@ -1514,20 +1522,25 @@ export default function App() {
         if (!useIframeFallback) setUseIframeFallback(true);
       };
     }
-  }, [playNext, useIframeFallback]);
+  }, [useIframeFallback]);
 
   useEffect(() => {
     if (backgroundAudio && currentStreamUrl && !useIframeFallback) {
       const currentPos = backgroundAudio.currentTime;
-      backgroundAudio.src = currentStreamUrl;
-      const savedProg = parseFloat(localStorage.getItem('savedProgress') || '0');
+      
+      // Only set src if it's actually different to avoid unnecessary reloads
+      const absoluteUrl = new URL(currentStreamUrl, window.location.href).href;
+      if (backgroundAudio.src !== absoluteUrl) {
+        backgroundAudio.src = currentStreamUrl;
+        const savedProg = parseFloat(localStorage.getItem('savedProgress') || '0');
 
-      // If we are restoring from previous session without auto-playing
-      if (!isPlaying && savedProg > 0) {
-        backgroundAudio.currentTime = savedProg;
-      } else if (isPlaying && currentPos > 0) {
-        // Stream URL upgraded mid-playback, seamlessly continue
-        backgroundAudio.currentTime = currentPos;
+        // If we are restoring from previous session without auto-playing
+        if (!isPlaying && savedProg > 0) {
+          backgroundAudio.currentTime = savedProg;
+        } else if (isPlaying && currentPos > 0) {
+          // Stream URL upgraded mid-playback, seamlessly continue
+          backgroundAudio.currentTime = currentPos;
+        }
       }
 
       if (isPlaying) {
@@ -1535,6 +1548,10 @@ export default function App() {
           console.error("URL change play failed", e);
           if (!useIframeFallback) setUseIframeFallback(true);
         });
+        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+      } else {
+        backgroundAudio.pause();
+        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
       }
     }
   }, [currentStreamUrl, useIframeFallback, isPlaying]);
