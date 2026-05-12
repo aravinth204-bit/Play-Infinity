@@ -1140,14 +1140,10 @@ export default function App() {
     'https://pipedapi.kavin.rocks',
     'https://api.piped.victr.me',
     'https://piped-api.lunar.icu',
+    'https://pipedapi.metafates.me',
     'https://api-piped.mha.fi',
     'https://pipedapi.drgns.space',
-    'https://pipedapi.synced.cloud',
-    'https://pipedapi.nexus.rocks',
-    'https://pipedapi.leptons.xyz',
-    'https://pipedapi.moom.beat.com',
-    'https://pipedapi.ducks.md',
-    'https://pipedapi.ramat.rocks'
+    'https://pipedapi.synced.cloud'
   ];
 
   const fetchPipedStream = async (videoId) => {
@@ -1207,16 +1203,17 @@ export default function App() {
 
     if (backgroundAudio) {
       backgroundAudio.pause();
-      // Use silent base64 to 'unlock' the element for background play
-      backgroundAudio.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
-      backgroundAudio.play().catch(e => console.warn("Background audio unlock start:", e));
+      backgroundAudio.currentTime = 0;
+      // CRITICAL: Set source and play immediately to ensure background play permission
+      const proxyUrl = `${streamEndpointBase}?videoId=${song.id}`;
+      backgroundAudio.src = proxyUrl;
+      backgroundAudio.play().catch(e => console.warn("Background play start:", e));
       if (silentAudioRef.current) silentAudioRef.current.play().catch(() => {});
     }
 
     currentSongIdRef.current = song.id;
     setProgress(0);
     setCurrentSong(song);
-    setupMediaSession(song); // CRITICAL: Update lock screen notification IMMEDIATELY
     setIsPlaying(true);
     setIsPlayerExpanded(true);
     setUseIframeFallback(false);
@@ -1258,12 +1255,10 @@ export default function App() {
       // Only set if we are still playing the same song
       if (directUrl && currentSongIdRef.current === song.id) {
         setDirectStreamUrl(directUrl);
-      } else if (!directUrl && currentSongIdRef.current === song.id) {
-        setUseIframeFallback(true);
       }
     }).catch(() => {
       if (currentSongIdRef.current === song.id) {
-        setUseIframeFallback(true);
+        setDirectStreamUrl(null);
       }
     });
   }, [currentSong, queue, isFetchingQueue, fallbackSongs, streamEndpointBase]);
@@ -1348,7 +1343,7 @@ export default function App() {
 
 
   const [directStreamUrl, setDirectStreamUrl] = useState(null);
-  const currentStreamUrl = directStreamUrl;
+  const currentStreamUrl = directStreamUrl || (currentSong ? `${streamEndpointBase}?videoId=${currentSong.id}` : '');
 
   // Mobile Background Playback & MediaSession API Logic
   const silentAudioRef = useRef(null);
@@ -1358,18 +1353,17 @@ export default function App() {
   playNextRef.current = playNext;
   playPrevRef.current = playPrev;
 
-  const setupMediaSession = useCallback((songOverride) => {
-    const song = songOverride || currentSong;
-    if ('mediaSession' in navigator && song) {
+  const setupMediaSession = useCallback(() => {
+    if ('mediaSession' in navigator && currentSong) {
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: song.title,
-        artist: song.artist || 'Unknown Artist',
+        title: currentSong.title,
+        artist: currentSong.artist || 'Unknown Artist',
         album: 'ISAI (இசை)',
         artwork: [
-          { src: song.thumbnail, sizes: '96x96', type: 'image/jpeg' },
-          { src: song.thumbnail, sizes: '128x128', type: 'image/jpeg' },
-          { src: song.thumbnail, sizes: '256x256', type: 'image/jpeg' },
-          { src: song.thumbnail, sizes: '512x512', type: 'image/jpeg' },
+          { src: '/logo.png', sizes: '96x96', type: 'image/png' },
+          { src: '/logo.png', sizes: '128x128', type: 'image/png' },
+          { src: '/logo.png', sizes: '256x256', type: 'image/png' },
+          { src: '/logo.png', sizes: '512x512', type: 'image/png' },
         ]
       });
 
@@ -1377,14 +1371,14 @@ export default function App() {
         navigator.mediaSession.setActionHandler('play', () => {
           setIsPlaying(true);
           if (backgroundAudio) backgroundAudio.play().catch(() => { });
-          if (silentAudioRef.current) silentAudioRef.current.play().catch(() => { });
+          silentAudioRef.current?.play().catch(() => { });
           navigator.mediaSession.playbackState = 'playing';
         });
 
         navigator.mediaSession.setActionHandler('pause', () => {
           setIsPlaying(false);
           if (backgroundAudio) backgroundAudio.pause();
-          if (silentAudioRef.current) silentAudioRef.current.pause();
+          silentAudioRef.current?.pause();
           navigator.mediaSession.playbackState = 'paused';
         });
 
@@ -1427,14 +1421,14 @@ export default function App() {
         navigator.mediaSession.setActionHandler('stop', () => {
           setIsPlaying(false);
           if (backgroundAudio) backgroundAudio.pause();
-          if (silentAudioRef.current) silentAudioRef.current.pause();
+          silentAudioRef.current?.pause();
           navigator.mediaSession.playbackState = 'none';
         });
       } catch (e) {
         console.warn("MediaSession handlers failed:", e);
       }
     }
-  }, [currentSong, setIsPlaying, duration, progress]);
+  }, [currentSong, setIsPlaying]);
 
   useEffect(() => {
     setUseIframeFallback(false);
@@ -1535,29 +1529,24 @@ export default function App() {
       const currentPos = backgroundAudio.currentTime;
       
       // Only set src if it's actually different to avoid unnecessary reloads
-      // We also check if current src is the 'silence' unlocker
       const absoluteUrl = new URL(currentStreamUrl, window.location.href).href;
-      const isSilence = backgroundAudio.src.startsWith('data:audio/wav;base64');
-
-      if (backgroundAudio.src !== absoluteUrl || isSilence) {
+      if (backgroundAudio.src !== absoluteUrl) {
         backgroundAudio.src = currentStreamUrl;
         const savedProg = parseFloat(localStorage.getItem('savedProgress') || '0');
 
         // If we are restoring from previous session without auto-playing
         if (!isPlaying && savedProg > 0) {
           backgroundAudio.currentTime = savedProg;
-        } else if (isPlaying && currentPos > 0 && !isSilence) {
+        } else if (isPlaying && currentPos > 0) {
           // Stream URL upgraded mid-playback, seamlessly continue
           backgroundAudio.currentTime = currentPos;
-        } else if (isSilence) {
-          // Reset to start after silence unlock
-          backgroundAudio.currentTime = 0;
         }
       }
 
       if (isPlaying) {
         backgroundAudio.play().catch(e => {
           console.error("URL change play failed", e);
+          if (!useIframeFallback) setUseIframeFallback(true);
         });
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
       } else {
