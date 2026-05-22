@@ -1395,7 +1395,7 @@ export default function App() {
       isPlayingRef.current = false; // ← sync update FIRST — stops watchdog from restarting audio
       navigator.mediaSession.playbackState = 'paused';
       if (backgroundAudio) backgroundAudio.pause();
-      // silentAudio intentionally NOT paused — keeps OS session + lock screen notification alive
+      if (silentAudioRef.current) silentAudioRef.current.pause();
       setIsPlaying(false); // async React update (ref already correct above)
     });
 
@@ -1433,6 +1433,7 @@ export default function App() {
     register('stop', () => {
       isPlayingRef.current = false;
       if (backgroundAudio) backgroundAudio.pause();
+      if (silentAudioRef.current) silentAudioRef.current.pause();
       navigator.mediaSession.playbackState = 'none';
       setIsPlaying(false);
     });
@@ -1479,8 +1480,7 @@ export default function App() {
         backgroundAudio.play().catch(() => {});
       } else {
         backgroundAudio.pause();
-        // silentAudioRef intentionally NOT paused — keeps OS audio session alive
-        // even when user pauses the song, so lock screen notification stays visible
+        if (silentAudioRef.current) silentAudioRef.current.pause();
       }
     }
   }, [isPlaying, useIframeFallback]);
@@ -1491,7 +1491,9 @@ export default function App() {
       // Start silentAudio and KEEP it playing (do not pause)
       // This holds the browser audio session open permanently
       if (silentAudioRef.current && silentAudioRef.current.paused) {
-        silentAudioRef.current.play().catch(() => {});
+        silentAudioRef.current.play().then(() => {
+          silentAudioRef.current.pause();
+        }).catch(() => {});
       }
       // Prime backgroundAudio (play+pause to unblock it, it will actually play when song loads)
       if (backgroundAudio && backgroundAudio.paused && !backgroundAudio.src) {
@@ -1521,7 +1523,7 @@ export default function App() {
       if (document.hidden) {
         // Screen locked / app backgrounded:
         // Keep silent audio playing so OS doesn't suspend audio session
-        if (silentAudioRef.current && silentAudioRef.current.paused) {
+        if (silentAudioRef.current && silentAudioRef.current.paused && isPlayingRef.current) {
           silentAudioRef.current.play().catch(() => {});
         }
         // Don't touch backgroundAudio — let it keep streaming
