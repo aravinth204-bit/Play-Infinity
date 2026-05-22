@@ -1365,25 +1365,39 @@ export default function App() {
   playNextRef.current = playNext;
   playPrevRef.current = playPrev;
 
-  // Register MediaSession handlers once on mount with individual try/catch
+  // Register MediaSession handlers — play/pause/next/prev/seek all wired
   useEffect(() => {
     if (!('mediaSession' in navigator)) return;
     const register = (action, handler) => {
       try { navigator.mediaSession.setActionHandler(action, handler); } catch {}
     };
+
+    // PLAY: resume AudioContext + both audio elements atomically
     register('play', () => {
+      // Resume suspended AudioContext first (iOS requirement)
+      if (audioCtxRef.current?.state === 'suspended') {
+        audioCtxRef.current.resume().then(() => {
+          if (backgroundAudio) backgroundAudio.play().catch(() => {});
+        }).catch(() => {});
+      } else {
+        if (backgroundAudio) backgroundAudio.play().catch(() => {});
+      }
+      // Keep silent audio alive so browser session stays active
+      if (silentAudioRef.current && silentAudioRef.current.paused) {
+        silentAudioRef.current.play().catch(() => {});
+      }
       setIsPlaying(true);
-      if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
-      silentAudioRef.current?.play().catch(() => {});
-      if (backgroundAudio) backgroundAudio.play().catch(() => {});
       navigator.mediaSession.playbackState = 'playing';
     });
+
     register('pause', () => {
-      setIsPlaying(false);
       if (backgroundAudio) backgroundAudio.pause();
-      silentAudioRef.current?.pause();
+      // DO NOT pause silentAudio — keep it looping so OS doesn't kill session
+      setIsPlaying(false);
       navigator.mediaSession.playbackState = 'paused';
     });
+
+    // NEXT / PREV — shown as buttons on lock screen
     register('previoustrack', () => {
       if (playPrevRef.current) playPrevRef.current();
       navigator.mediaSession.playbackState = 'playing';
@@ -1392,48 +1406,56 @@ export default function App() {
       if (playNextRef.current) playNextRef.current();
       navigator.mediaSession.playbackState = 'playing';
     });
+
     register('seekbackward', (details) => {
       const skipTime = details.seekOffset || 10;
       const newPos = Math.max(backgroundAudio ? backgroundAudio.currentTime - skipTime : 0, 0);
       if (backgroundAudio) backgroundAudio.currentTime = newPos;
-      if (playerRef.current) playerRef.current.seekTo(newPos, "seconds");
+      if (playerRef.current) playerRef.current.seekTo(newPos, 'seconds');
       setProgress(newPos);
     });
     register('seekforward', (details) => {
       const skipTime = details.seekOffset || 10;
       const newPos = Math.min(backgroundAudio ? backgroundAudio.currentTime + skipTime : 0, duration || 999);
       if (backgroundAudio) backgroundAudio.currentTime = newPos;
-      if (playerRef.current) playerRef.current.seekTo(newPos, "seconds");
+      if (playerRef.current) playerRef.current.seekTo(newPos, 'seconds');
       setProgress(newPos);
     });
     register('seekto', (details) => {
-      if (playerRef.current) playerRef.current.seekTo(details.seekTime, "seconds");
+      if (playerRef.current) playerRef.current.seekTo(details.seekTime, 'seconds');
       if (backgroundAudio) backgroundAudio.currentTime = details.seekTime;
       setProgress(details.seekTime);
     });
     register('stop', () => {
       setIsPlaying(false);
       if (backgroundAudio) backgroundAudio.pause();
-      silentAudioRef.current?.pause();
       navigator.mediaSession.playbackState = 'none';
     });
   }, []);
 
-  // Update MediaSession metadata when song changes
+  // Update MediaSession metadata when song changes (lock screen title + artwork + next/prev)
   useEffect(() => {
     if (!('mediaSession' in navigator) || !currentSong) return;
     const thumb = currentSong.thumbnail || '/logo.png';
+    // Use high-res YouTube thumbnail if available
+    const hiRes = thumb.replace(/(hqdefault|mqdefault|sddefault)\.jpg/i, 'maxresdefault.jpg');
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: currentSong.title,
-      artist: currentSong.artist || 'Unknown Artist',
-      album: 'ISAI (இசை)',
+      title: currentSong.title || 'Unknown Title',
+      artist: (currentSong.artist || 'Unknown Artist').replace(/ - Topic| VEVO/gi, ''),
+      album: 'ISAI இசை · Play Infinity',
       artwork: [
-        { src: thumb, sizes: '96x96', type: 'image/jpeg' },
-        { src: thumb, sizes: '128x128', type: 'image/jpeg' },
-        { src: thumb, sizes: '256x256', type: 'image/jpeg' },
-        { src: thumb, sizes: '512x512', type: 'image/jpeg' },
+        { src: thumb,  sizes: '96x96',   type: 'image/jpeg' },
+        { src: thumb,  sizes: '128x128', type: 'image/jpeg' },
+        { src: thumb,  sizes: '192x192', type: 'image/jpeg' },
+        { src: hiRes,  sizes: '512x512', type: 'image/jpeg' },
       ]
     });
+    // Explicitly re-register next/prev handlers so they always appear
+    const register = (action, handler) => {
+      try { navigator.mediaSession.setActionHandler(action, handler); } catch {}
+    };
+    register('previoustrack', () => { if (playPrevRef.current) playPrevRef.current(); });
+    register('nexttrack',     () => { if (playNextRef.current) playNextRef.current(); });
   }, [currentSong]);
 
   useEffect(() => {
@@ -1445,51 +1467,95 @@ export default function App() {
     if (backgroundAudio) {
       if (isPlaying && !useIframeFallback) {
         if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
-        if (silentAudioRef.current) silentAudioRef.current.play().catch(() => { });
-        backgroundAudio.play().catch(() => { });
+        // silentAudio keeps looping always — holds OS audio session open
+        if (silentAudioRef.current && silentAudioRef.current.paused) {
+          silentAudioRef.current.play().catch(() => {});
+        }
+        backgroundAudio.play().catch(() => {});
       } else {
         backgroundAudio.pause();
-        if (silentAudioRef.current) silentAudioRef.current.pause();
+        // silentAudioRef intentionally NOT paused — keeps OS audio session alive
+        // even when user pauses the song, so lock screen notification stays visible
       }
     }
   }, [isPlaying, useIframeFallback]);
 
-  // Audio Context Unlock for Mobile
+  // Audio Context Unlock for Mobile — fires on first user touch
   useEffect(() => {
     const unlock = () => {
-      if (silentAudioRef.current) {
-        silentAudioRef.current.play().then(() => {
-          silentAudioRef.current.pause();
-          window.removeEventListener('click', unlock);
-          window.removeEventListener('touchstart', unlock);
-        }).catch(() => { });
+      // Start silentAudio and KEEP it playing (do not pause)
+      // This holds the browser audio session open permanently
+      if (silentAudioRef.current && silentAudioRef.current.paused) {
+        silentAudioRef.current.play().catch(() => {});
       }
-      if (backgroundAudio) {
+      // Prime backgroundAudio (play+pause to unblock it, it will actually play when song loads)
+      if (backgroundAudio && backgroundAudio.paused && !backgroundAudio.src) {
         backgroundAudio.play().then(() => {
           backgroundAudio.pause();
-        }).catch(() => { });
+        }).catch(() => {});
       }
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('touchstart', unlock);
     };
     window.addEventListener('click', unlock);
-    window.addEventListener('touchstart', unlock);
+    window.addEventListener('touchstart', unlock, { passive: true });
     return () => {
       window.removeEventListener('click', unlock);
       window.removeEventListener('touchstart', unlock);
     };
   }, []);
 
-  // Resume playback when phone unlocks / page becomes visible
+  // ── Lock screen / Background keep-alive ─────────────────────────────────────
+  // Strategy:
+  //  1. Silent audio loops non-stop → keeps browser audio session alive on iOS/Android
+  //  2. visibilitychange: when screen locks (hidden) keep silent looping;
+  //     when screen unlocks (visible) and isPlaying, resume backgroundAudio
+  //  3. A 4s watchdog interval re-checks and re-plays if audio silently stopped
   useEffect(() => {
     const handleVisibility = () => {
-      if (!document.hidden && isPlayingRef.current) {
-        if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
-        if (silentAudioRef.current) silentAudioRef.current.play().catch(() => {});
-        if (backgroundAudio && backgroundAudio.paused) backgroundAudio.play().catch(() => {});
-        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+      if (document.hidden) {
+        // Screen locked / app backgrounded:
+        // Keep silent audio playing so OS doesn't suspend audio session
+        if (silentAudioRef.current && silentAudioRef.current.paused) {
+          silentAudioRef.current.play().catch(() => {});
+        }
+        // Don't touch backgroundAudio — let it keep streaming
+      } else {
+        // Screen unlocked / app foregrounded:
+        if (isPlayingRef.current) {
+          if (audioCtxRef.current?.state === 'suspended') {
+            audioCtxRef.current.resume().catch(() => {});
+          }
+          if (silentAudioRef.current && silentAudioRef.current.paused) {
+            silentAudioRef.current.play().catch(() => {});
+          }
+          if (backgroundAudio && backgroundAudio.paused) {
+            backgroundAudio.play().catch(() => {});
+          }
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'playing';
+          }
+        }
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
+
+    // Watchdog: every 4s, if we SHOULD be playing but audio stopped, restart it
+    const watchdog = setInterval(() => {
+      if (isPlayingRef.current && backgroundAudio && backgroundAudio.paused && !backgroundAudio.ended) {
+        if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume().catch(() => {});
+        backgroundAudio.play().catch(() => {});
+      }
+      // Keep silent keepalive looping no matter what
+      if (silentAudioRef.current && silentAudioRef.current.paused && isPlayingRef.current) {
+        silentAudioRef.current.play().catch(() => {});
+      }
+    }, 4000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      clearInterval(watchdog);
+    };
   }, []);
 
   useEffect(() => {
@@ -1580,7 +1646,15 @@ export default function App() {
     <div className="flex items-center justify-center bg-black overflow-hidden font-['Outfit'] aurora-bg" style={{ height: '100dvh' }}>
 
       {/* Invisible HTML5 Audio to keep browser session alive for iOS/Android Background playing */}
-      <audio ref={silentAudioRef} loop playsInline src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=" />
+      {/* DO NOT add muted — muted audio doesn't hold the audio session on iOS */}
+      <audio
+        ref={silentAudioRef}
+        loop
+        playsInline
+        x-webkit-airplay="deny"
+        src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="
+        style={{ display: 'none' }}
+      />
 
       {/* Native Audio Proxy & YouTube Player Fallback */}
       {currentSong && (
@@ -2888,100 +2962,322 @@ export default function App() {
       </div >
 
       {/* App Container - Desktop Layout */}
-      <div className="hidden md:flex w-full max-w-[1200px] h-[850px] max-h-[90vh] bg-[#121422] rounded-[36px] shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden text-[#a0a3b1]">
-        {/* Left Sidebar */}
-        <div className="w-64 bg-[#1a1c2a] flex flex-col pt-10 pb-8 px-8 border-r border-[#262837] shrink-0 z-10 transition-colors">
-          <h1 className="text-2xl font-bold mb-10 text-white flex items-center gap-4 px-1">
-            <img src="/logo.png" alt="Isai" className="h-12 w-12 object-cover rounded-2xl shadow-xl transition-all" style={{ boxShadow: `0 10px 30px ${dominantColor}33` }} />
-            <div className="flex flex-col">
-              <span className="text-white tracking-tighter text-3xl font-black italic -mb-1">ISAI</span>
-            </div>
-          </h1>
-          <nav className="flex-1 space-y-5 overflow-y-auto no-scrollbar">
-            <div className="flex items-center gap-4 font-semibold cursor-pointer border-l-2 pl-2 -ml-2.5 transition-all" style={{ color: dominantColor, borderColor: dominantColor }}>
-              <Music size={18} /> <span className="text-sm">Playlist</span>
-            </div>
-            <div className="flex items-center gap-4 hover:text-white font-medium cursor-pointer transition-colors pl-2">
-              <Heart size={18} /> <span className="text-sm">Favorites</span>
-            </div>
+      <div className="hidden md:flex w-full max-w-[1300px] h-[90vh] max-h-[900px] bg-[#121422] rounded-[36px] shadow-[0_20px_80px_rgba(0,0,0,0.7)] relative overflow-hidden text-[#a0a3b1]">
+
+        {/* LEFT SIDEBAR */}
+        <div className="w-56 bg-[#1a1c2a] flex flex-col pt-8 pb-8 px-6 border-r border-[#262837] shrink-0 z-10">
+          {/* Logo */}
+          <div className="flex items-center gap-3 mb-10 px-1">
+            <img src="/logo.png" alt="Isai" className="h-10 w-10 object-cover rounded-xl shadow-xl" style={{ boxShadow: `0 8px 24px ${dominantColor}44` }} />
+            <span className="text-white tracking-tighter text-2xl font-black italic">ISAI</span>
+          </div>
+
+          {/* Nav Links */}
+          <nav className="flex-1 space-y-1">
+            {[
+              { icon: <Home size={18} />, label: 'Explore', tab: 'Home' },
+              { icon: <Search size={18} />, label: 'Search', tab: 'Search' },
+              { icon: <Heart size={18} />, label: 'Favorites', tab: 'Favorites' },
+              { icon: <Download size={18} />, label: 'Downloads', tab: 'History' },
+            ].map((item) => (
+              <button
+                key={item.tab}
+                onClick={() => setActiveTab(item.tab)}
+                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold transition-all ${
+                  activeTab === item.tab
+                    ? 'text-white'
+                    : 'text-[#6b6f80] hover:text-white hover:bg-white/5'
+                }`}
+                style={activeTab === item.tab ? { backgroundColor: `${dominantColor}22`, color: dominantColor } : {}}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </button>
+            ))}
           </nav>
-          <div className="mt-auto space-y-5">
-            <div className="flex items-center gap-4 hover:text-white font-medium cursor-pointer transition-colors pl-2">
-              <Settings size={18} /> <span className="text-sm">Settings</span>
-            </div>
+
+          {/* Bottom */}
+          <div className="mt-auto">
+            <button className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-[#6b6f80] hover:text-white hover:bg-white/5 transition-all">
+              <Settings size={18} />
+              <span>Settings</span>
+            </button>
           </div>
         </div>
 
-        {/* Middle Column (Main Content) */}
-        <div className="flex-1 flex flex-col p-8 overflow-hidden bg-[#121422]">
-          <form onSubmit={searchYoutube} className="mb-8 z-20 shrink-0">
-            <div className="relative max-w-2xl flex gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-6 top-4 text-gray-500" size={18} />
+        {/* MIDDLE COLUMN */}
+        <div className="flex-1 flex flex-col overflow-hidden bg-[#121422]">
+          {/* Top Bar */}
+          <div className="flex items-center justify-between px-8 pt-8 pb-4 shrink-0">
+            <div>
+              <p className="text-[#6b6f80] text-xs font-bold uppercase tracking-widest">
+                {(() => { const h = new Date().getHours(); return h < 12 ? 'Good Morning ☀️' : h < 17 ? 'Good Afternoon 🌤️' : h < 21 ? 'Good Evening 🌆' : 'Good Night 🌙'; })()}
+              </p>
+              <h1 className="text-white text-xl font-black mt-0.5">Explore and see what's trending today</h1>
+            </div>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setActiveTab('Search')} className="w-10 h-10 bg-[#1a1c2a] rounded-full flex items-center justify-center text-[#6b6f80] hover:text-white transition-all border border-[#262837]">
+                <Search size={17} />
+              </button>
+              <button onClick={() => setActiveTab('Profile')} className="w-10 h-10 bg-[#1a1c2a] rounded-full flex items-center justify-center text-[#6b6f80] hover:text-white transition-all border border-[#262837]">
+                <User size={17} />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto no-scrollbar px-8 pb-8">
+            {/* Search Bar */}
+            <form onSubmit={searchYoutube} className="mb-7 shrink-0">
+              <div className="relative max-w-lg">
+                <Search className="absolute left-4 top-3.5 text-gray-500" size={16} />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search..."
-                  className="w-full bg-[#1a1c2a] px-14 py-3.5 rounded-full outline-none focus:ring-1 focus:ring-[#8cd92b] text-white"
+                  placeholder="Songs, artists, moods..."
+                  className="w-full bg-[#1a1c2a] pl-11 pr-4 py-3 rounded-xl outline-none focus:ring-1 text-white text-sm border border-[#262837] focus:border-transparent"
+                  style={{ outline: 'none' }}
                 />
               </div>
-            </div>
-          </form>
+            </form>
 
-          <div className="flex-1 overflow-y-auto no-scrollbar pb-10 flex flex-col pt-2">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold text-white tracking-wide">
-                {songs.length > 0 ? "Search Results" : "Suggested For You"}
-              </h3>
+            {/* Music Directors Section */}
+            <div className="mb-7">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-white font-bold text-base">Music Directors</h2>
+                <span className="text-xs font-bold uppercase tracking-widest" style={{ color: dominantColor }}>See all</span>
+              </div>
+              <div className="flex gap-5 overflow-x-auto no-scrollbar pb-1">
+                {MUSIC_DIRECTORS.slice(0, 6).map((director) => (
+                  <button
+                    key={director.id}
+                    onClick={() => fetchDirectorSongs(director)}
+                    className="flex flex-col items-center gap-2 shrink-0 group cursor-pointer"
+                  >
+                    <div
+                      className="w-[72px] h-[72px] rounded-full overflow-hidden shadow-lg relative transition-all group-hover:scale-105"
+                      style={{ border: `2.5px solid ${director.accentColor}66` }}
+                    >
+                      <img src={director.photo} alt={director.name} className="w-full h-full object-cover object-top" onError={(e) => { e.target.style.display = 'none'; }} />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                    </div>
+                    <span className="text-[11px] font-semibold text-white/70 group-hover:text-white transition-colors w-16 text-center truncate leading-tight">{director.name}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="space-y-1">
-              {(songs.length > 0 ? songs : fallbackSongs).map((song, idx) => (
-                <DesktopSongRow
-                  key={song.id}
-                  song={song}
-                  onSelect={() => playSong(song)}
-                  isFavorite={favoriteIds.has(song.id)}
-                  onToggleFavorite={(e) => toggleFavorite(e, song)}
-                />
-              ))}
+
+            {/* Top Playlists */}
+            <div className="mb-7">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-white font-bold text-base">Top playlists</h2>
+                <button onClick={() => setActiveTab('Playlists')} className="text-xs font-bold uppercase tracking-widest transition-colors" style={{ color: dominantColor }}>See all</button>
+              </div>
+              {/* Featured playlist card */}
+              {(currentSong || trendingSongs[0]) && (
+                <div
+                  onClick={() => currentSong ? setIsPlayerExpanded(true) : playSong(trendingSongs[0])}
+                  className="relative rounded-2xl overflow-hidden cursor-pointer group transition-all hover:scale-[1.01] active:scale-[0.99]"
+                  style={{ background: `linear-gradient(135deg, ${dominantColor}33 0%, #1a1c2a 100%)`, border: `1px solid ${dominantColor}33` }}
+                >
+                  <div className="flex items-start gap-4 p-5">
+                    <div className="w-28 h-28 rounded-xl overflow-hidden shadow-xl shrink-0">
+                      <img
+                        src={currentSong?.thumbnail || trendingSongs[0]?.thumbnail || '/logo.png'}
+                        alt=""
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0 pt-1">
+                      <h3 className="text-white font-bold text-base leading-snug mb-1 line-clamp-2">
+                        {currentSong ? cleanTitle(currentSong.title) : (trendingSongs[0]?.title || 'Chartbuster Tamil Hits')}
+                      </h3>
+                      <p className="text-[#6b6f80] text-xs font-medium truncate">
+                        {currentSong?.artist?.replace(/ - Topic| VEVO/gi, '') || trendingSongs[0]?.artist || 'Various Artists'}
+                      </p>
+                      <div className="flex items-center gap-3 mt-4">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); currentSong ? togglePlay() : (trendingSongs[0] && playSong(trendingSongs[0])); }}
+                          className="w-9 h-9 rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110 active:scale-90"
+                          style={{ backgroundColor: dominantColor }}
+                        >
+                          {isPlaying && currentSong ? <Pause size={16} fill="#121422" className="text-[#121422]" /> : <Play size={16} fill="#121422" className="text-[#121422] ml-0.5" />}
+                        </button>
+                        <AnimatedHeart size={18} isFavorite={currentSong ? favoriteIds.has(currentSong.id) : false} onClick={(e) => currentSong && toggleFavorite(e, currentSong)} />
+                        <button className="text-[#6b6f80] hover:text-white transition-colors">
+                          <Download size={16} />
+                        </button>
+                        <button className="text-[#6b6f80] hover:text-white transition-colors">
+                          <MoreHorizontal size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Mini Progress Bar inside card */}
+                  {currentSong && (
+                    <div className="px-5 pb-4">
+                      <div className="flex items-center gap-3 text-[10px] text-[#6b6f80] font-mono">
+                        <span>{formatTime(progress)}</span>
+                        <div className="flex-1 h-1 bg-[#262837] rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-200" style={{ width: `${(progress / (duration || 1)) * 100}%`, backgroundColor: dominantColor }} />
+                        </div>
+                        <span>{formatTime(duration)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Top daily songs / Song List */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-white font-bold text-base">
+                  {songs.length > 0 ? 'Search Results' : 'Top daily songs'}
+                </h2>
+              </div>
+              <div className="space-y-0.5">
+                {(songs.length > 0 ? songs : (trendingSongs.length > 0 ? trendingSongs : fallbackSongs)).slice(0, 12).map((song, idx) => (
+                  <div
+                    key={song.id || idx}
+                    onClick={() => playSong(song)}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all hover:bg-[#1a1c2a] group border border-transparent hover:border-[#262837]"
+                  >
+                    <div className="relative shrink-0">
+                      <img src={song.thumbnail} alt="" className="w-11 h-11 rounded-lg object-cover shadow-sm" />
+                      {currentSong?.id === song.id && isPlaying && (
+                        <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
+                          <div className="flex gap-[2px] items-end h-4">
+                            {[0,1,2].map(b => <div key={b} className="w-[2px] rounded-full animate-bounce" style={{ height: `${6+b*3}px`, backgroundColor: dominantColor, animationDelay: `${b*0.1}s` }} />)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-white text-[13px] font-semibold truncate leading-snug">{cleanTitle(song.title)}</h4>
+                      <p className="text-[#6b6f80] text-[11px] truncate mt-0.5">{song.artist?.replace(/ - Topic| VEVO/gi, '')}</p>
+                    </div>
+                    {currentSong?.id === song.id && (
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: dominantColor }} />
+                    )}
+                    <button onClick={(e) => { e.stopPropagation(); setShowSongOptions(song); }} className="text-[#6b6f80] hover:text-white transition-colors shrink-0 opacity-0 group-hover:opacity-100">
+                      <MoreVertical size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Right Sidebar (Now Playing) */}
-        <div className="w-80 bg-[#1a1c2a] flex flex-col pt-8 pb-8 px-6 border-l border-[#262837] shrink-0 z-10 shadow-[-10px_0_30px_rgba(0,0,0,0.1)]">
+        {/* RIGHT SIDEBAR — Now Playing */}
+        <div className="w-[320px] bg-[#1a1c2a] flex flex-col pt-8 pb-6 border-l border-[#262837] shrink-0 z-10">
           {currentSong ? (
-            <div className="flex-1 flex flex-col w-full h-full overflow-hidden justify-center items-center py-6">
-              <h3 className="text-xl font-bold text-white mb-8">Now Playing</h3>
-              <div className="w-full h-28 rounded-full overflow-hidden shadow-2xl mb-8 bg-[#121422]">
-                <img src={currentSong.thumbnail} alt="" className="w-full h-full object-cover rounded-full" />
-              </div>
-              <div className="w-full mb-4">
-                <h4 className="font-bold text-white text-base truncate">{currentSong.title}</h4>
-                <p className="text-xs text-gray-400 truncate mt-1">{currentSong.artist}</p>
-              </div>
-              <div className="w-full mb-10">
-                <div className="h-1 bg-[#262837] rounded-full overflow-hidden relative">
-                  <div className="h-full bg-[#8cd92b] absolute top-0 left-0" style={{ width: `${(progress / (duration || 1)) * 100}%` }}></div>
+            <div className="flex flex-col h-full px-6 overflow-y-auto no-scrollbar">
+              {/* Mini player controls row */}
+              <div className="flex items-center justify-between mb-6 shrink-0">
+                <div className="flex items-center gap-2">
+                  <button onClick={playPrev} className="w-8 h-8 flex items-center justify-center text-[#6b6f80] hover:text-white transition-all">
+                    <SkipBack size={18} fill="currentColor" />
+                  </button>
+                  <button
+                    onClick={togglePlay}
+                    className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-105 active:scale-90"
+                    style={{ backgroundColor: dominantColor }}
+                  >
+                    {isPlaying ? <Pause size={18} fill="#121422" className="text-[#121422]" /> : <Play size={18} fill="#121422" className="text-[#121422] ml-0.5" />}
+                  </button>
+                  <button onClick={playNext} className="w-8 h-8 flex items-center justify-center text-[#6b6f80] hover:text-white transition-all">
+                    <SkipForward size={18} fill="currentColor" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button className="text-[#6b6f80] hover:text-white transition-all">
+                    <Shuffle size={16} />
+                  </button>
+                  <button className="text-[#6b6f80] hover:text-white transition-all">
+                    <Repeat size={16} />
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center justify-between w-full mt-2">
-                <button onClick={playPrev} className="text-white hover:text-[#8cd92b]"><SkipBack size={24} fill="currentColor" /></button>
-                <button onClick={togglePlay} className="w-16 h-16 bg-[#8cd92b] rounded-full text-[#121422] flex items-center justify-center">
-                  {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
-                </button>
-                <button onClick={playNext} className="text-white hover:text-[#8cd92b]"><SkipForward size={24} fill="currentColor" /></button>
+
+              {/* Album Art */}
+              <div
+                className="w-full aspect-square rounded-2xl overflow-hidden shadow-2xl mb-5 shrink-0 relative"
+                style={{ boxShadow: isPlaying ? `0 20px 60px ${dominantColor}55` : '0 20px 40px rgba(0,0,0,0.5)' }}
+              >
+                <img src={getHighResImage(currentSong.thumbnail)} alt="" className={`w-full h-full object-cover ${isPlaying ? 'scale-[1.02]' : 'scale-100'} transition-transform duration-500`} />
+                {/* Equalizer overlay */}
+                {isPlaying && (
+                  <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/70 to-transparent flex items-end justify-center gap-[2px] px-6 pb-3">
+                    {Array.from({ length: 20 }).map((_, i) => {
+                      const val = audioData[i % (audioData.length || 1)] || 0;
+                      return (
+                        <div key={i} className="flex-1 max-w-[4px] rounded-full transition-all duration-100"
+                          style={{ height: `${Math.max(10, (val / 255) * 90)}%`, backgroundColor: dominantColor, opacity: 0.85 }} />
+                      );
+                    })}
+                  </div>
+                )}
               </div>
+
+              {/* Song Info */}
+              <div className="flex items-start justify-between mb-4 shrink-0">
+                <div className="flex-1 min-w-0 pr-2">
+                  <h3 className="text-white font-bold text-base leading-tight truncate">{cleanTitle(currentSong.title)}</h3>
+                  <p className="text-[#6b6f80] text-sm truncate mt-0.5">{currentSong.artist?.replace(/ - Topic| VEVO/gi, '')}</p>
+                </div>
+                <AnimatedHeart size={20} isFavorite={favoriteIds.has(currentSong.id)} onClick={(e) => toggleFavorite(e, currentSong)} />
+              </div>
+
+              {/* Progress Bar */}
+              <div className="mb-4 shrink-0">
+                <input
+                  type="range"
+                  min={0}
+                  max={duration || 1}
+                  value={progress}
+                  onChange={handleSeek}
+                  className="w-full h-1 rounded-full appearance-none cursor-pointer"
+                  style={{ accentColor: dominantColor, background: `linear-gradient(to right, ${dominantColor} ${(progress/(duration||1))*100}%, #262837 ${(progress/(duration||1))*100}%)` }}
+                />
+                <div className="flex justify-between mt-1.5">
+                  <span className="text-[#6b6f80] text-[10px] font-mono">{formatTime(progress)}</span>
+                  <span className="text-[#6b6f80] text-[10px] font-mono">{formatTime(duration)}</span>
+                </div>
+              </div>
+
+              {/* Queue / Up Next */}
+              {queue.length > 0 && (
+                <div className="mt-2 flex-1 min-h-0">
+                  <h4 className="text-[#6b6f80] text-[10px] font-bold uppercase tracking-widest mb-2">Up Next</h4>
+                  <div className="space-y-1 overflow-y-auto no-scrollbar">
+                    {queue.slice(0, 5).map((song, i) => (
+                      <div key={`q-${i}`} onClick={() => playSong(song)} className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-[#262837] cursor-pointer transition-all group">
+                        <img src={song.thumbnail} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-[11px] font-semibold truncate">{cleanTitle(song.title)}</p>
+                          <p className="text-[#6b6f80] text-[10px] truncate">{song.artist?.replace(/ - Topic| VEVO/gi, '')}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center opacity-30">
-              <Music size={32} className="mb-4" />
-              <p>Play a song</p>
+            <div className="flex-1 flex flex-col items-center justify-center text-center px-6 opacity-30">
+              <div className="w-20 h-20 rounded-full bg-[#262837] flex items-center justify-center mb-4">
+                <Music size={32} />
+              </div>
+              <p className="text-white font-bold">Nothing playing</p>
+              <p className="text-sm mt-1">Pick a song to start listening</p>
             </div>
           )}
         </div>
+
       </div>
+
     </div>
   );
 }
