@@ -1365,89 +1365,76 @@ export default function App() {
   playNextRef.current = playNext;
   playPrevRef.current = playPrev;
 
-  const setupMediaSession = useCallback(() => {
-    if ('mediaSession' in navigator && currentSong) {
-      const thumb = currentSong.thumbnail || '/logo.png';
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: currentSong.title,
-        artist: currentSong.artist || 'Unknown Artist',
-        album: 'ISAI (இசை)',
-        artwork: [
-          { src: thumb, sizes: '96x96', type: 'image/jpeg' },
-          { src: thumb, sizes: '128x128', type: 'image/jpeg' },
-          { src: thumb, sizes: '256x256', type: 'image/jpeg' },
-          { src: thumb, sizes: '512x512', type: 'image/jpeg' },
-        ]
-      });
-
-      try {
-        navigator.mediaSession.setActionHandler('play', () => {
-          setIsPlaying(true);
-          if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
-          silentAudioRef.current?.play().catch(() => { });
-          if (backgroundAudio) backgroundAudio.play().catch(() => { });
-          navigator.mediaSession.playbackState = 'playing';
-        });
-
-        navigator.mediaSession.setActionHandler('pause', () => {
-          setIsPlaying(false);
-          if (backgroundAudio) backgroundAudio.pause();
-          silentAudioRef.current?.pause();
-          navigator.mediaSession.playbackState = 'paused';
-        });
-
-        navigator.mediaSession.setActionHandler('previoustrack', () => {
-          if (playPrevRef.current) playPrevRef.current();
-          navigator.mediaSession.playbackState = 'playing';
-        });
-
-        navigator.mediaSession.setActionHandler('nexttrack', () => {
-          if (playNextRef.current) playNextRef.current();
-          navigator.mediaSession.playbackState = 'playing';
-        });
-
-        navigator.mediaSession.setActionHandler('seekbackward', (details) => {
-          const skipTime = details.seekOffset || 10;
-          const newPos = Math.max(backgroundAudio ? backgroundAudio.currentTime - skipTime : progress - skipTime, 0);
-          if (backgroundAudio) backgroundAudio.currentTime = newPos;
-          if (playerRef.current) playerRef.current.seekTo(newPos, "seconds");
-          setProgress(newPos);
-        });
-
-        navigator.mediaSession.setActionHandler('seekforward', (details) => {
-          const skipTime = details.seekOffset || 10;
-          const newPos = Math.min(backgroundAudio ? backgroundAudio.currentTime + skipTime : progress + skipTime, duration || 999);
-          if (backgroundAudio) backgroundAudio.currentTime = newPos;
-          if (playerRef.current) playerRef.current.seekTo(newPos, "seconds");
-          setProgress(newPos);
-        });
-
-        navigator.mediaSession.setActionHandler('seekto', (details) => {
-          if (playerRef.current) {
-            playerRef.current.seekTo(details.seekTime, "seconds");
-          }
-          if (backgroundAudio) {
-            backgroundAudio.currentTime = details.seekTime;
-          }
-          setProgress(details.seekTime);
-        });
-
-        navigator.mediaSession.setActionHandler('stop', () => {
-          setIsPlaying(false);
-          if (backgroundAudio) backgroundAudio.pause();
-          silentAudioRef.current?.pause();
-          navigator.mediaSession.playbackState = 'none';
-        });
-      } catch (e) {
-        console.warn("MediaSession handlers failed:", e);
-      }
-    }
-  }, [currentSong, setIsPlaying]);
-
+  // Register MediaSession handlers once on mount with individual try/catch
   useEffect(() => {
-    setUseIframeFallback(false);
-    setupMediaSession();
-  }, [currentSong, setupMediaSession]);
+    if (!('mediaSession' in navigator)) return;
+    const register = (action, handler) => {
+      try { navigator.mediaSession.setActionHandler(action, handler); } catch {}
+    };
+    register('play', () => {
+      setIsPlaying(true);
+      if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
+      silentAudioRef.current?.play().catch(() => {});
+      if (backgroundAudio) backgroundAudio.play().catch(() => {});
+      navigator.mediaSession.playbackState = 'playing';
+    });
+    register('pause', () => {
+      setIsPlaying(false);
+      if (backgroundAudio) backgroundAudio.pause();
+      silentAudioRef.current?.pause();
+      navigator.mediaSession.playbackState = 'paused';
+    });
+    register('previoustrack', () => {
+      if (playPrevRef.current) playPrevRef.current();
+      navigator.mediaSession.playbackState = 'playing';
+    });
+    register('nexttrack', () => {
+      if (playNextRef.current) playNextRef.current();
+      navigator.mediaSession.playbackState = 'playing';
+    });
+    register('seekbackward', (details) => {
+      const skipTime = details.seekOffset || 10;
+      const newPos = Math.max(backgroundAudio ? backgroundAudio.currentTime - skipTime : 0, 0);
+      if (backgroundAudio) backgroundAudio.currentTime = newPos;
+      if (playerRef.current) playerRef.current.seekTo(newPos, "seconds");
+      setProgress(newPos);
+    });
+    register('seekforward', (details) => {
+      const skipTime = details.seekOffset || 10;
+      const newPos = Math.min(backgroundAudio ? backgroundAudio.currentTime + skipTime : 0, duration || 999);
+      if (backgroundAudio) backgroundAudio.currentTime = newPos;
+      if (playerRef.current) playerRef.current.seekTo(newPos, "seconds");
+      setProgress(newPos);
+    });
+    register('seekto', (details) => {
+      if (playerRef.current) playerRef.current.seekTo(details.seekTime, "seconds");
+      if (backgroundAudio) backgroundAudio.currentTime = details.seekTime;
+      setProgress(details.seekTime);
+    });
+    register('stop', () => {
+      setIsPlaying(false);
+      if (backgroundAudio) backgroundAudio.pause();
+      silentAudioRef.current?.pause();
+      navigator.mediaSession.playbackState = 'none';
+    });
+  }, []);
+
+  // Update MediaSession metadata when song changes
+  useEffect(() => {
+    if (!('mediaSession' in navigator) || !currentSong) return;
+    const thumb = currentSong.thumbnail || '/logo.png';
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentSong.title,
+      artist: currentSong.artist || 'Unknown Artist',
+      album: 'ISAI (இசை)',
+      artwork: [
+        { src: thumb, sizes: '96x96', type: 'image/jpeg' },
+        { src: thumb, sizes: '128x128', type: 'image/jpeg' },
+        { src: thumb, sizes: '256x256', type: 'image/jpeg' },
+        { src: thumb, sizes: '512x512', type: 'image/jpeg' },
+      ]
+    });
+  }, [currentSong]);
 
   useEffect(() => {
     isPlayingRef.current = isPlaying;
