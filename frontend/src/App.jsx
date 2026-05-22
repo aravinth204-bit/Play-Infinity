@@ -1344,10 +1344,14 @@ export default function App() {
   };
 
   const handleSeek = (e) => {
-    if (!playerRef.current) return;
     const value = parseFloat(e.target.value);
     setProgress(value);
-    playerRef.current.seekTo(value, "seconds");
+    if (backgroundAudio && !useIframeFallback) {
+      backgroundAudio.currentTime = value;
+    }
+    if (playerRef.current && useIframeFallback) {
+      playerRef.current.seekTo(value, "seconds");
+    }
   };
 
   const playNext = useCallback(() => {
@@ -1692,14 +1696,26 @@ export default function App() {
       const tag = e.target.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
       if (e.code === 'Space') { e.preventDefault(); if (currentSong) setIsPlaying(p => !p); }
-      if (e.code === 'ArrowRight') { e.preventDefault(); const np = Math.min(progress + 10, duration); setProgress(np); if (backgroundAudio) backgroundAudio.currentTime = np; }
-      if (e.code === 'ArrowLeft') { e.preventDefault(); const np = Math.max(progress - 10, 0); setProgress(np); if (backgroundAudio) backgroundAudio.currentTime = np; }
+      if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        const np = Math.min(progress + 10, duration);
+        setProgress(np);
+        if (backgroundAudio && !useIframeFallback) backgroundAudio.currentTime = np;
+        if (playerRef.current && useIframeFallback) playerRef.current.seekTo(np, 'seconds');
+      }
+      if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        const np = Math.max(progress - 10, 0);
+        setProgress(np);
+        if (backgroundAudio && !useIframeFallback) backgroundAudio.currentTime = np;
+        if (playerRef.current && useIframeFallback) playerRef.current.seekTo(np, 'seconds');
+      }
       if (e.code === 'KeyN') { e.preventDefault(); playNext(); }
       if (e.code === 'KeyB') { e.preventDefault(); playPrev(); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [currentSong, progress, duration]);
+  }, [currentSong, progress, duration, useIframeFallback]);
 
   // FEATURE: Swipe gestures on Now Playing
   const swipeTouchStartX = useRef(null);
@@ -1727,7 +1743,29 @@ export default function App() {
       };
 
       backgroundAudio.onended = () => {
-        if (playNextRef.current) playNextRef.current();
+        const diff = Math.abs(backgroundAudio.duration - backgroundAudio.currentTime);
+        // Only skip to next song if we are close to the end (e.g., within 3 seconds) or if duration is not loaded
+        if (!backgroundAudio.duration || diff < 3) {
+          if (playNextRef.current) playNextRef.current();
+        } else {
+          console.warn("Premature ended event detected. Attempting to recover stream... diff:", diff);
+          const currentPos = backgroundAudio.currentTime;
+          if (currentStreamUrl) {
+            backgroundAudio.src = '';
+            backgroundAudio.src = currentStreamUrl;
+            backgroundAudio.load();
+            const handleMetadata = () => {
+              backgroundAudio.currentTime = currentPos;
+              if (isPlayingRef.current) {
+                backgroundAudio.play().catch((err) => {
+                  console.warn("Recovery play failed:", err);
+                });
+              }
+              backgroundAudio.removeEventListener('loadedmetadata', handleMetadata);
+            };
+            backgroundAudio.addEventListener('loadedmetadata', handleMetadata);
+          }
+        }
       };
       backgroundAudio.ontimeupdate = () => setProgress(backgroundAudio.currentTime);
       backgroundAudio.onloadeddata = () => setDuration(backgroundAudio.duration);
@@ -1750,7 +1788,14 @@ export default function App() {
             backgroundAudio.src = '';
             backgroundAudio.src = currentStreamUrl;
             backgroundAudio.load();
-            if (currentPos > 0) backgroundAudio.currentTime = currentPos;
+            const handleMetadata = () => {
+              if (currentPos > 0) {
+                backgroundAudio.currentTime = currentPos;
+              }
+              backgroundAudio.removeEventListener('loadedmetadata', handleMetadata);
+            };
+            backgroundAudio.addEventListener('loadedmetadata', handleMetadata);
+
             backgroundAudio.play().catch((err) => {
               console.warn("Stream refresh play failed:", err);
             });
@@ -1763,8 +1808,17 @@ export default function App() {
           console.warn("Audio error. Trying Piped fallback URL...");
           backgroundAudio.src = pipedFallbackUrlRef.current;
           backgroundAudio.load();
-          if (currentPos > 0) backgroundAudio.currentTime = currentPos;
-          if (isPlayingRef.current) backgroundAudio.play().catch(() => {});
+          const handleMetadata = () => {
+            if (currentPos > 0) {
+              backgroundAudio.currentTime = currentPos;
+            }
+            backgroundAudio.removeEventListener('loadedmetadata', handleMetadata);
+          };
+          backgroundAudio.addEventListener('loadedmetadata', handleMetadata);
+
+          if (isPlayingRef.current) {
+            backgroundAudio.play().catch(() => {});
+          }
           return;
         }
         
@@ -1795,13 +1849,15 @@ export default function App() {
         backgroundAudio.src = currentStreamUrl;
         const savedProg = parseFloat(localStorage.getItem('savedProgress') || '0');
 
-        // If we are restoring from previous session without auto-playing
-        if (!isPlaying && savedProg > 0) {
-          backgroundAudio.currentTime = savedProg;
-        } else if (isPlaying && currentPos > 0) {
-          // Stream URL upgraded mid-playback, seamlessly continue
-          backgroundAudio.currentTime = currentPos;
-        }
+        const handleMetadata = () => {
+          if (!isPlaying && savedProg > 0) {
+            backgroundAudio.currentTime = savedProg;
+          } else if (isPlaying && currentPos > 0) {
+            backgroundAudio.currentTime = currentPos;
+          }
+          backgroundAudio.removeEventListener('loadedmetadata', handleMetadata);
+        };
+        backgroundAudio.addEventListener('loadedmetadata', handleMetadata);
       }
 
       if (isPlaying) {
