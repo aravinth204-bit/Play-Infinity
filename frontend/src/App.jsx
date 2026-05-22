@@ -63,6 +63,11 @@ if (backgroundAudio) {
   backgroundAudio.style.display = 'none';
   backgroundAudio.setAttribute('playsinline', 'true');
   backgroundAudio.crossOrigin = "anonymous"; // CRITICAL for Equalizer analysis
+  if (document.body) {
+    document.body.appendChild(backgroundAudio);
+  } else {
+    document.addEventListener('DOMContentLoaded', () => document.body.appendChild(backgroundAudio));
+  }
 }
 
 const DesktopSongRow = React.memo(function DesktopSongRow({
@@ -1204,11 +1209,12 @@ export default function App() {
     if (backgroundAudio) {
       backgroundAudio.pause();
       backgroundAudio.currentTime = 0;
+      // Play silent audio first to establish audio session on mobile
+      if (silentAudioRef.current) silentAudioRef.current.play().catch(() => {});
       // CRITICAL: Set source and play immediately to ensure background play permission
       const proxyUrl = `${streamEndpointBase}?videoId=${song.id}`;
       backgroundAudio.src = proxyUrl;
       backgroundAudio.play().catch(e => console.warn("Background play start:", e));
-      if (silentAudioRef.current) silentAudioRef.current.play().catch(() => {});
     }
 
     currentSongIdRef.current = song.id;
@@ -1355,23 +1361,25 @@ export default function App() {
 
   const setupMediaSession = useCallback(() => {
     if ('mediaSession' in navigator && currentSong) {
+      const thumb = currentSong.thumbnail || '/logo.png';
       navigator.mediaSession.metadata = new MediaMetadata({
         title: currentSong.title,
         artist: currentSong.artist || 'Unknown Artist',
         album: 'ISAI (இசை)',
         artwork: [
-          { src: '/logo.png', sizes: '96x96', type: 'image/png' },
-          { src: '/logo.png', sizes: '128x128', type: 'image/png' },
-          { src: '/logo.png', sizes: '256x256', type: 'image/png' },
-          { src: '/logo.png', sizes: '512x512', type: 'image/png' },
+          { src: thumb, sizes: '96x96', type: 'image/jpeg' },
+          { src: thumb, sizes: '128x128', type: 'image/jpeg' },
+          { src: thumb, sizes: '256x256', type: 'image/jpeg' },
+          { src: thumb, sizes: '512x512', type: 'image/jpeg' },
         ]
       });
 
       try {
         navigator.mediaSession.setActionHandler('play', () => {
           setIsPlaying(true);
-          if (backgroundAudio) backgroundAudio.play().catch(() => { });
+          if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
           silentAudioRef.current?.play().catch(() => { });
+          if (backgroundAudio) backgroundAudio.play().catch(() => { });
           navigator.mediaSession.playbackState = 'playing';
         });
 
@@ -1442,8 +1450,9 @@ export default function App() {
     // Update native audio directly to bypass React cycle in background
     if (backgroundAudio) {
       if (isPlaying && !useIframeFallback) {
-        backgroundAudio.play().catch(() => { });
+        if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
         if (silentAudioRef.current) silentAudioRef.current.play().catch(() => { });
+        backgroundAudio.play().catch(() => { });
       } else {
         backgroundAudio.pause();
         if (silentAudioRef.current) silentAudioRef.current.pause();
@@ -1544,6 +1553,7 @@ export default function App() {
       }
 
       if (isPlaying) {
+        if (silentAudioRef.current) silentAudioRef.current.play().catch(() => {});
         backgroundAudio.play().catch(e => {
           console.error("URL change play failed", e);
           if (!useIframeFallback) setUseIframeFallback(true);

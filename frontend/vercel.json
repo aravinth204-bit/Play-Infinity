@@ -6,7 +6,7 @@
             "destination": "/api/$1"
         },
         {
-            "source": "/(.*)",
+            "source": "/((?!sw\\.js|manifest\\.json|logo\\.png).*)",
             "destination": "/index.html"
         }
     ]
