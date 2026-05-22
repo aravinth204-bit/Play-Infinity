@@ -1,6 +1,7 @@
 const CACHE_NAME = 'play-infinity-m-v1';
 const STATIC_ASSETS = [
   '/',
+  '/index.html',
   '/manifest.json',
   '/logo.png',
 ];

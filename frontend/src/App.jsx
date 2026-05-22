@@ -62,7 +62,10 @@ if (backgroundAudio) {
   backgroundAudio.id = "play-infinity-core-audio";
   backgroundAudio.style.display = 'none';
   backgroundAudio.setAttribute('playsinline', 'true');
+  backgroundAudio.setAttribute('preload', 'auto');
   backgroundAudio.crossOrigin = "anonymous"; // CRITICAL for Equalizer analysis
+  backgroundAudio.volume = 1;
+  backgroundAudio.muted = false;
   if (document.body) {
     document.body.appendChild(backgroundAudio);
   } else {
@@ -241,6 +244,7 @@ export default function App() {
 
   // FEATURE: Offline Indicator
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [installPromptEvent, setInstallPromptEvent] = useState(null);
 
   // FEATURE: Playback Speed
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
@@ -265,6 +269,17 @@ export default function App() {
       }
     } catch { }
   }, []);
+
+  useEffect(() => {
+    const beforeInstallHandler = (event) => {
+      event.preventDefault();
+      setInstallPromptEvent(event);
+      showToast('Install ISAI from your browser menu for background play.', 'success');
+    };
+
+    window.addEventListener('beforeinstallprompt', beforeInstallHandler);
+    return () => window.removeEventListener('beforeinstallprompt', beforeInstallHandler);
+  }, [showToast]);
 
   // Save current song, queue, and progress to localStorage for restore
   useEffect(() => {
@@ -1287,8 +1302,18 @@ export default function App() {
   }, [currentSong, queue, isFetchingQueue, fallbackSongs, streamEndpointBase]);
 
   const togglePlay = () => {
-    if (!currentSong) return;
-    setIsPlaying(!isPlaying);
+    if (!currentSong || !backgroundAudio) return;
+    if (isPlaying) {
+      backgroundAudio.pause();
+      if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+      setIsPlaying(false);
+    } else {
+      backgroundAudio.play().catch((err) => {
+        console.warn('togglePlay backgroundAudio.play failed:', err);
+      });
+      if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+      setIsPlaying(true);
+    }
   };
 
   // FEATURE: Share Song
