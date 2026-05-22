@@ -229,6 +229,7 @@ export default function App() {
   const analyserRef = useRef(null);
   const audioCtxRef = useRef(null);
   const sourceRef = useRef(null);
+  const isPlayingRef = useRef(false);
 
   // FEATURE: Toast Notifications
   const [toasts, setToasts] = useState([]);
@@ -1185,6 +1186,11 @@ export default function App() {
     try {
       if (!audioCtxRef.current) {
         audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        audioCtxRef.current.onstatechange = () => {
+          if (audioCtxRef.current?.state === 'suspended' && isPlayingRef.current) {
+            audioCtxRef.current.resume();
+          }
+        };
         analyserRef.current = audioCtxRef.current.createAnalyser();
         analyserRef.current.fftSize = 64;
         analyserRef.current.smoothingTimeConstant = 0.8;
@@ -1444,6 +1450,7 @@ export default function App() {
   }, [currentSong, setupMediaSession]);
 
   useEffect(() => {
+    isPlayingRef.current = isPlaying;
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
     }
@@ -1482,6 +1489,20 @@ export default function App() {
       window.removeEventListener('click', unlock);
       window.removeEventListener('touchstart', unlock);
     };
+  }, []);
+
+  // Resume playback when phone unlocks / page becomes visible
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (!document.hidden && isPlayingRef.current) {
+        if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
+        if (silentAudioRef.current) silentAudioRef.current.play().catch(() => {});
+        if (backgroundAudio && backgroundAudio.paused) backgroundAudio.play().catch(() => {});
+        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
 
   useEffect(() => {
