@@ -1315,9 +1315,13 @@ export default function App() {
   };
 
   const playNext = useCallback(() => {
+    const now = Date.now();
+    if (now - lastSkipTimeRef.current < 2500) return; // Prevent rapid skips (debounce)
+    lastSkipTimeRef.current = now;
     if (queue.length > 0) {
       playSong(queue[0], true);
     } else if (isFetchingQueue) {
+      lastSkipTimeRef.current = 0; // Reset so next valid skip works
       return;
     } else if (fallbackSongs.length > 0) {
       const idx = fallbackSongs.findIndex(s => s.id === currentSong?.id);
@@ -1361,6 +1365,7 @@ export default function App() {
   const silentAudioRef = useRef(null);
   const playNextRef = useRef(playNext);
   const playPrevRef = useRef(playPrev);
+  const lastSkipTimeRef = useRef(0);
 
   playNextRef.current = playNext;
   playPrevRef.current = playPrev;
@@ -1630,6 +1635,9 @@ export default function App() {
         const error = backgroundAudio.error;
         console.error("Audio player error:", error);
         
+        // Don't skip if we're not actively playing — prevents rapid cycling through stale preloaded URLs on session restore
+        if (!isPlayingRef.current) return;
+        
         const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         
         if (isMobile) {
@@ -1657,24 +1665,18 @@ export default function App() {
 
   useEffect(() => {
     if (backgroundAudio && currentStreamUrl && !useIframeFallback) {
-      const currentPos = backgroundAudio.currentTime;
-      
-      // Only set src if it's actually different to avoid unnecessary reloads
-      const absoluteUrl = new URL(currentStreamUrl, window.location.href).href;
-      if (backgroundAudio.src !== absoluteUrl) {
-        backgroundAudio.src = currentStreamUrl;
-        const savedProg = parseFloat(localStorage.getItem('savedProgress') || '0');
-
-        // If we are restoring from previous session without auto-playing
-        if (!isPlaying && savedProg > 0) {
-          backgroundAudio.currentTime = savedProg;
-        } else if (isPlaying && currentPos > 0) {
-          // Stream URL upgraded mid-playback, seamlessly continue
-          backgroundAudio.currentTime = currentPos;
-        }
-      }
-
       if (isPlaying) {
+        const currentPos = backgroundAudio.currentTime;
+        
+        // Only set src if it's actually different to avoid unnecessary reloads
+        const absoluteUrl = new URL(currentStreamUrl, window.location.href).href;
+        if (backgroundAudio.src !== absoluteUrl) {
+          backgroundAudio.src = currentStreamUrl;
+          if (currentPos > 0) {
+            backgroundAudio.currentTime = currentPos;
+          }
+        }
+
         if (silentAudioRef.current) silentAudioRef.current.play().catch(() => {});
         backgroundAudio.play().catch(e => {
           console.error("URL change play failed", e);
