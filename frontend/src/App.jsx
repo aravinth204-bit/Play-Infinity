@@ -1217,14 +1217,24 @@ export default function App() {
     if (backgroundAudio) {
       backgroundAudio.pause();
       backgroundAudio.currentTime = 0;
-      // Play silent audio first to establish audio session on mobile
+            // Play silent audio first to establish audio session on mobile
       if (silentAudioRef.current) silentAudioRef.current.play().catch(() => {});
       // CRITICAL: Set source and play immediately to ensure background play permission
       const proxyUrl = `${streamEndpointBase}?videoId=${song.id}`;
       backgroundAudio.src = proxyUrl;
-      backgroundAudio.play().catch(e => console.warn("Background play start:", e));
+      backgroundAudio.play().catch(e => {
+        console.warn("Background play start failed:", e);
+        if (document.hidden) {
+          setIsPlaying(false);
+          isPlayingRef.current = false;
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'paused';
+          }
+        }
+      });
     }
 
+    streamRetryCountRef.current = 0;
     currentSongIdRef.current = song.id;
     setProgress(0);
     // Sync playback state immediately so lock screen shows correct state
@@ -1367,6 +1377,7 @@ export default function App() {
   const playNextRef = useRef(playNext);
   const playPrevRef = useRef(playPrev);
   const lastSkipTimeRef = useRef(0);
+  const streamRetryCountRef = useRef(0);
 
   playNextRef.current = playNext;
   playPrevRef.current = playPrev;
@@ -1381,19 +1392,21 @@ export default function App() {
     // PLAY: resume AudioContext + both audio elements atomically
     const resumeAndPlay = () => {
       if (backgroundAudio) {
-        if (!backgroundAudio.src && currentStreamUrl) {
+        // If audio has an error or is uninitialized, refresh with currentStreamUrl
+        const hasError = backgroundAudio.error || backgroundAudio.networkState === 3;
+        if ((!backgroundAudio.src || hasError) && currentStreamUrl) {
           backgroundAudio.src = currentStreamUrl;
+          backgroundAudio.load();
         }
-        // If audio is in error state, reload src before playing
-        if (backgroundAudio.error && currentStreamUrl && backgroundAudio.src) {
-          const savedSrc = backgroundAudio.src;
-          backgroundAudio.src = '';
-          backgroundAudio.src = savedSrc;
-        }
-        backgroundAudio.play().catch(() => {});
+        backgroundAudio.play().catch((err) => {
+          console.warn("resumeAndPlay backgroundAudio.play failed:", err);
+        });
       }
     };
     register('play', () => {
+      // Force disable iframe fallback because lock screen requires native playback
+      setUseIframeFallback(false);
+      
       // Resume suspended AudioContext first (iOS requirement)
       if (audioCtxRef.current?.state === 'suspended') {
         audioCtxRef.current.resume().then(resumeAndPlay).catch(resumeAndPlay);
@@ -1414,10 +1427,16 @@ export default function App() {
       navigator.mediaSession.playbackState = 'paused';
       if (backgroundAudio) backgroundAudio.pause();
       
-      // Keep silent audio looping on ALL platforms to prevent Android
-      // from removing the MediaSession notification when no audio is active
-      if (silentAudioRef.current && silentAudioRef.current.paused) {
-        silentAudioRef.current.play().catch(() => {});
+      // Keep silent audio looping on iOS (to keep session active) but pause it on Android
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (silentAudioRef.current) {
+        if (isIOS) {
+          if (silentAudioRef.current.paused) {
+            silentAudioRef.current.play().catch(() => {});
+          }
+        } else {
+          silentAudioRef.current.pause();
+        }
       }
       
       setIsPlaying(false); // async React update (ref already correct above)
@@ -1504,13 +1523,28 @@ export default function App() {
         if (silentAudioRef.current && silentAudioRef.current.paused) {
           silentAudioRef.current.play().catch(() => {});
         }
-        backgroundAudio.play().catch(() => {});
+        backgroundAudio.play().catch(err => {
+          console.warn("isPlaying effect backgroundAudio.play failed:", err);
+          if (document.hidden) {
+            setIsPlaying(false);
+            isPlayingRef.current = false;
+            if ('mediaSession' in navigator) {
+              navigator.mediaSession.playbackState = 'paused';
+            }
+          }
+        });
       } else {
         backgroundAudio.pause();
-        // Keep silent audio looping on ALL platforms to prevent Android
-        // from removing the MediaSession notification when no audio is active
-        if (silentAudioRef.current && silentAudioRef.current.paused) {
-          silentAudioRef.current.play().catch(() => {});
+        // Keep silent audio looping on iOS (to keep session active) but pause it on Android
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        if (silentAudioRef.current) {
+          if (isIOS) {
+            if (silentAudioRef.current.paused) {
+              silentAudioRef.current.play().catch(() => {});
+            }
+          } else {
+            silentAudioRef.current.pause();
+          }
         }
       }
     }
@@ -1649,6 +1683,24 @@ export default function App() {
   // backgroundAudio setup and event handlers
   useEffect(() => {
     if (backgroundAudio) {
+      backgroundAudio.onplay = () => {
+        if (useIframeFallback) return;
+        isPlayingRef.current = true;
+        setIsPlaying(true);
+        if ('mediaSession' in navigator) {
+          navigator.mediaSession.playbackState = 'playing';
+        }
+      };
+      
+      backgroundAudio.onpause = () => {
+        if (useIframeFallback) return;
+        isPlayingRef.current = false;
+        setIsPlaying(false);
+        if ('mediaSession' in navigator) {
+          navigator.mediaSession.playbackState = 'paused';
+        }
+      };
+
       backgroundAudio.onended = () => {
         if (playNextRef.current) playNextRef.current();
       };
@@ -1664,6 +1716,23 @@ export default function App() {
         const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         const currentPos = backgroundAudio.currentTime;
         
+        // Robust auto-recovery using original API proxy to fetch a fresh URL, up to 2 times
+        if (streamRetryCountRef.current < 2) {
+          streamRetryCountRef.current += 1;
+          console.warn(`Attempting stream URL refresh recovery (attempt ${streamRetryCountRef.current})...\n`);
+          
+          if (currentStreamUrl) {
+            backgroundAudio.src = '';
+            backgroundAudio.src = currentStreamUrl;
+            backgroundAudio.load();
+            if (currentPos > 0) backgroundAudio.currentTime = currentPos;
+            backgroundAudio.play().catch((err) => {
+              console.warn("Stream refresh play failed:", err);
+            });
+            return;
+          }
+        }
+        
         // Try Piped fallback URL first if available
         if (pipedFallbackUrlRef.current && backgroundAudio.src !== pipedFallbackUrlRef.current) {
           console.warn("Audio error. Trying Piped fallback URL...");
@@ -1674,21 +1743,19 @@ export default function App() {
           return;
         }
         
-        // Try reloading current URL (transient error recovery)
-        if (error && (error.code === 1 || error.code === 2)) {
-          console.warn("Transient audio error. Attempting auto-recovery...");
-          if (currentStreamUrl) {
-            backgroundAudio.src = currentStreamUrl;
-            backgroundAudio.load();
-            if (currentPos > 0) backgroundAudio.currentTime = currentPos;
-            if (isPlayingRef.current) backgroundAudio.play().catch(() => {});
+        if (isMobile) {
+          // On mobile, if we are in the foreground, we can fallback to iframe. If we are in the background, we must skip.
+          if (!document.hidden) {
+            console.warn("Mobile fatal audio error in foreground. Falling back to iframe...");
+            if (!useIframeFallback) setUseIframeFallback(true);
+          } else {
+            console.warn("Mobile fatal audio error in background. Skipping to next song...");
+            playNext();
           }
-          return;
+        } else {
+          console.warn("Fatal audio error on desktop. Falling back to iframe...");
+          if (!useIframeFallback) setUseIframeFallback(true);
         }
-        
-        // Final fallback: use iframe (works reliably on mobile lock screen)
-        console.warn("Fatal audio error. Falling back to iframe player...");
-        if (!useIframeFallback) setUseIframeFallback(true);
       };
     }
   }, [useIframeFallback, currentStreamUrl]);
@@ -1718,7 +1785,16 @@ export default function App() {
           console.error("URL change play failed", e);
           const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
           if (isMobile) {
-            if (!document.hidden && !useIframeFallback) setUseIframeFallback(true);
+            if (!document.hidden) {
+              if (!useIframeFallback) setUseIframeFallback(true);
+            } else {
+              // Screen is hidden/locked. Set playing to false to prevent stuck state.
+              setIsPlaying(false);
+              isPlayingRef.current = false;
+              if ('mediaSession' in navigator) {
+                navigator.mediaSession.playbackState = 'paused';
+              }
+            }
           } else {
             if (!useIframeFallback) setUseIframeFallback(true);
           }
@@ -1731,7 +1807,7 @@ export default function App() {
     }
   }, [currentStreamUrl, useIframeFallback, isPlaying]);
 
-  // No native player needed for web PWA
+// No native player needed for web PWA
 
   return (
     <div className="flex items-center justify-center bg-black overflow-hidden font-['Outfit'] aurora-bg" style={{ height: '100dvh' }}>
