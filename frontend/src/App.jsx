@@ -1401,13 +1401,10 @@ export default function App() {
       navigator.mediaSession.playbackState = 'paused';
       if (backgroundAudio) backgroundAudio.pause();
       
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-      if (silentAudioRef.current) {
-        if (isIOS) {
-          silentAudioRef.current.play().catch(() => {});
-        } else {
-          silentAudioRef.current.pause();
-        }
+      // Keep silent audio looping on ALL platforms to prevent Android
+      // from removing the MediaSession notification when no audio is active
+      if (silentAudioRef.current && silentAudioRef.current.paused) {
+        silentAudioRef.current.play().catch(() => {});
       }
       
       setIsPlaying(false); // async React update (ref already correct above)
@@ -1494,9 +1491,10 @@ export default function App() {
         backgroundAudio.play().catch(() => {});
       } else {
         backgroundAudio.pause();
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        if (silentAudioRef.current && !isIOS) {
-          silentAudioRef.current.pause();
+        // Keep silent audio looping on ALL platforms to prevent Android
+        // from removing the MediaSession notification when no audio is active
+        if (silentAudioRef.current && silentAudioRef.current.paused) {
+          silentAudioRef.current.play().catch(() => {});
         }
       }
     }
