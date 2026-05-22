@@ -1649,8 +1649,13 @@ export default function App() {
               }
             }
           } else {
-            console.error("Fatal audio error on mobile. Skipping to next song...");
-            if (playNextRef.current) playNextRef.current();
+            if (!document.hidden) {
+              console.warn("Fatal audio error on mobile while foregrounded. Falling back to iframe...");
+              if (!useIframeFallback) setUseIframeFallback(true);
+            } else {
+              console.error("Fatal audio error on mobile while backgrounded. Skipping to next song...");
+              if (playNextRef.current) playNextRef.current();
+            }
           }
         } else {
           if (!useIframeFallback) setUseIframeFallback(true);
@@ -1683,7 +1688,11 @@ export default function App() {
         backgroundAudio.play().catch(e => {
           console.error("URL change play failed", e);
           const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-          if (!isMobile && !useIframeFallback) setUseIframeFallback(true);
+          if (isMobile) {
+            if (!document.hidden && !useIframeFallback) setUseIframeFallback(true);
+          } else {
+            if (!useIframeFallback) setUseIframeFallback(true);
+          }
         });
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
       } else {
