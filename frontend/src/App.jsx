@@ -1139,7 +1139,9 @@ export default function App() {
 
 
 
-  const streamEndpointBase = 'https://play-infinity.vercel.app/api/stream';
+  const streamEndpointBase = typeof window !== 'undefined'
+    ? `${window.location.origin}/api/stream`
+    : '/api/stream';
 
   // List of public Piped instances as backbridge for background play
   const pipedInstances = [
@@ -1225,12 +1227,12 @@ export default function App() {
 
     currentSongIdRef.current = song.id;
     setProgress(0);
+    // Sync playback state immediately so lock screen shows correct state
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
     setCurrentSong(song);
     setIsPlaying(true);
     setIsPlayerExpanded(true);
     setUseIframeFallback(false);
-    setDirectStreamUrl(null);
-
     sessionPlayedIds.current.add(song.id);
     addPlayedTitleTokens(song.title);
 
@@ -1264,13 +1266,12 @@ export default function App() {
     }
 
     fetchPipedStream(song.id).then(directUrl => {
-      // Only set if we are still playing the same song
       if (directUrl && currentSongIdRef.current === song.id) {
-        setDirectStreamUrl(directUrl);
+        pipedFallbackUrlRef.current = directUrl;
       }
     }).catch(() => {
       if (currentSongIdRef.current === song.id) {
-        setDirectStreamUrl(null);
+        pipedFallbackUrlRef.current = null;
       }
     });
   }, [currentSong, queue, isFetchingQueue, fallbackSongs, streamEndpointBase]);
@@ -1358,8 +1359,8 @@ export default function App() {
   }, [currentSong, songs, trendingSongs, playSong]);
 
 
-  const [directStreamUrl, setDirectStreamUrl] = useState(null);
-  const currentStreamUrl = directStreamUrl || (currentSong ? `${streamEndpointBase}?videoId=${currentSong.id}` : '');
+  const pipedFallbackUrlRef = useRef(null);
+  const currentStreamUrl = currentSong ? `${streamEndpointBase}?videoId=${currentSong.id}` : '';
 
   // Mobile Background Playback & MediaSession API Logic
   const silentAudioRef = useRef(null);
@@ -1454,17 +1455,20 @@ export default function App() {
   useEffect(() => {
     if (!('mediaSession' in navigator) || !currentSong) return;
     const thumb = currentSong.thumbnail || '/logo.png';
+    // Make thumbnail URLs absolute (required for lock screen display on mobile)
+    const toAbsolute = (url) => url.startsWith('http') ? url : `${window.location.origin}${url}`;
+    const absThumb = toAbsolute(thumb);
     // Use high-res YouTube thumbnail if available
-    const hiRes = thumb.replace(/(hqdefault|mqdefault|sddefault)\.jpg/i, 'maxresdefault.jpg');
+    const hiRes = absThumb.replace(/(hqdefault|mqdefault|sddefault)\.jpg/i, 'maxresdefault.jpg');
     navigator.mediaSession.metadata = new MediaMetadata({
       title: currentSong.title || 'Unknown Title',
       artist: (currentSong.artist || 'Unknown Artist').replace(/ - Topic| VEVO/gi, ''),
       album: 'ISAI இசை · Play Infinity',
       artwork: [
-        { src: thumb,  sizes: '96x96',   type: 'image/jpeg' },
-        { src: thumb,  sizes: '128x128', type: 'image/jpeg' },
-        { src: thumb,  sizes: '192x192', type: 'image/jpeg' },
-        { src: hiRes,  sizes: '512x512', type: 'image/jpeg' },
+        { src: absThumb, sizes: '96x96',   type: 'image/jpeg' },
+        { src: absThumb, sizes: '128x128', type: 'image/jpeg' },
+        { src: absThumb, sizes: '192x192', type: 'image/jpeg' },
+        { src: hiRes,    sizes: '512x512', type: 'image/jpeg' },
       ]
     });
     // Explicitly re-register next/prev handlers so they always appear
@@ -1506,9 +1510,7 @@ export default function App() {
       // Start silentAudio and KEEP it playing (do not pause)
       // This holds the browser audio session open permanently
       if (silentAudioRef.current && silentAudioRef.current.paused) {
-        silentAudioRef.current.play().then(() => {
-          silentAudioRef.current.pause();
-        }).catch(() => {});
+        silentAudioRef.current.play().catch(() => {});
       }
       // Prime backgroundAudio (play+pause to unblock it, it will actually play when song loads)
       if (backgroundAudio && backgroundAudio.paused && !backgroundAudio.src) {
@@ -1633,31 +1635,33 @@ export default function App() {
         if (!isPlayingRef.current) return;
         
         const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const currentPos = backgroundAudio.currentTime;
         
-        if (isMobile) {
-          if (error && (error.code === 1 || error.code === 2)) {
-            console.warn("Mobile transient audio error. Attempting auto-recovery...");
-            const currentPos = backgroundAudio.currentTime;
-            if (currentStreamUrl) {
-              backgroundAudio.src = currentStreamUrl;
-              backgroundAudio.load();
-              backgroundAudio.currentTime = currentPos;
-              if (isPlayingRef.current) {
-                backgroundAudio.play().catch(() => {});
-              }
-            }
-          } else {
-            if (!document.hidden) {
-              console.warn("Fatal audio error on mobile while foregrounded. Falling back to iframe...");
-              if (!useIframeFallback) setUseIframeFallback(true);
-            } else {
-              console.error("Fatal audio error on mobile while backgrounded. Skipping to next song...");
-              if (playNextRef.current) playNextRef.current();
-            }
-          }
-        } else {
-          if (!useIframeFallback) setUseIframeFallback(true);
+        // Try Piped fallback URL first if available
+        if (pipedFallbackUrlRef.current && backgroundAudio.src !== pipedFallbackUrlRef.current) {
+          console.warn("Audio error. Trying Piped fallback URL...");
+          backgroundAudio.src = pipedFallbackUrlRef.current;
+          backgroundAudio.load();
+          if (currentPos > 0) backgroundAudio.currentTime = currentPos;
+          if (isPlayingRef.current) backgroundAudio.play().catch(() => {});
+          return;
         }
+        
+        // Try reloading current URL (transient error recovery)
+        if (error && (error.code === 1 || error.code === 2)) {
+          console.warn("Transient audio error. Attempting auto-recovery...");
+          if (currentStreamUrl) {
+            backgroundAudio.src = currentStreamUrl;
+            backgroundAudio.load();
+            if (currentPos > 0) backgroundAudio.currentTime = currentPos;
+            if (isPlayingRef.current) backgroundAudio.play().catch(() => {});
+          }
+          return;
+        }
+        
+        // Final fallback: use iframe (works reliably on mobile lock screen)
+        console.warn("Fatal audio error. Falling back to iframe player...");
+        if (!useIframeFallback) setUseIframeFallback(true);
       };
     }
   }, [useIframeFallback, currentStreamUrl]);
