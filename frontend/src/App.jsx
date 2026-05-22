@@ -1379,14 +1379,26 @@ export default function App() {
     };
 
     // PLAY: resume AudioContext + both audio elements atomically
+    const resumeAndPlay = () => {
+      if (backgroundAudio) {
+        if (!backgroundAudio.src && currentStreamUrl) {
+          backgroundAudio.src = currentStreamUrl;
+        }
+        // If audio is in error state, reload src before playing
+        if (backgroundAudio.error && currentStreamUrl && backgroundAudio.src) {
+          const savedSrc = backgroundAudio.src;
+          backgroundAudio.src = '';
+          backgroundAudio.src = savedSrc;
+        }
+        backgroundAudio.play().catch(() => {});
+      }
+    };
     register('play', () => {
       // Resume suspended AudioContext first (iOS requirement)
       if (audioCtxRef.current?.state === 'suspended') {
-        audioCtxRef.current.resume().then(() => {
-          if (backgroundAudio) backgroundAudio.play().catch(() => {});
-        }).catch(() => {});
+        audioCtxRef.current.resume().then(resumeAndPlay).catch(resumeAndPlay);
       } else {
-        if (backgroundAudio) backgroundAudio.play().catch(() => {});
+        resumeAndPlay();
       }
       // Keep silent audio alive so browser session stays active
       if (silentAudioRef.current && silentAudioRef.current.paused) {
@@ -1532,13 +1544,17 @@ export default function App() {
   // ── Lock screen / Background keep-alive ─────────────────────────────────────
   // Strategy:
   //  1. Silent audio loops non-stop → keeps browser audio session alive on iOS/Android
-  //  2. visibilitychange: when screen locks (hidden) keep silent looping;
+  //  2. visibilitychange: when screen locks (hidden) actively maintain audio;
   //     when screen unlocks (visible) and isPlaying, resume backgroundAudio
-  //  3. A 4s watchdog interval re-checks and re-plays if audio silently stopped
+  //  3. A 3s watchdog interval re-checks and re-plays if audio silently stopped
   useEffect(() => {
     const handleVisibility = () => {
       if (document.hidden) {
         // Screen locked / app backgrounded:
+        // Resume AudioContext if suspended — prevents OS from closing the session
+        if (audioCtxRef.current?.state === 'suspended') {
+          audioCtxRef.current.resume().catch(() => {});
+        }
         // Keep silent audio playing so OS doesn't suspend audio session
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         if (silentAudioRef.current && silentAudioRef.current.paused) {
@@ -1546,7 +1562,10 @@ export default function App() {
             silentAudioRef.current.play().catch(() => {});
           }
         }
-        // Don't touch backgroundAudio — let it keep streaming
+        // Proactively restart backgroundAudio if it stopped on lock
+        if (isPlayingRef.current && backgroundAudio && backgroundAudio.paused && !backgroundAudio.ended) {
+          if (backgroundAudio.src) backgroundAudio.play().catch(() => {});
+        }
       } else {
         // Screen unlocked / app foregrounded:
         if (isPlayingRef.current) {
@@ -1567,17 +1586,25 @@ export default function App() {
     };
     document.addEventListener('visibilitychange', handleVisibility);
 
-    // Watchdog: every 4s, if we SHOULD be playing but audio stopped, restart it
+    // Watchdog: every 3s, if we SHOULD be playing but audio stopped, restart it
     const watchdog = setInterval(() => {
-      if (isPlayingRef.current && backgroundAudio && backgroundAudio.paused && !backgroundAudio.ended) {
-        if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume().catch(() => {});
-        backgroundAudio.play().catch(() => {});
+      if (isPlayingRef.current && backgroundAudio) {
+        // Resume AudioContext if suspended
+        if (audioCtxRef.current?.state === 'suspended') {
+          audioCtxRef.current.resume().catch(() => {});
+        }
+        // Restart backgroundAudio if paused (not ended)
+        if (backgroundAudio.paused && !backgroundAudio.ended) {
+          if (backgroundAudio.src) {
+            backgroundAudio.play().catch(() => {});
+          }
+        }
       }
       // Keep silent keepalive looping no matter what
       if (silentAudioRef.current && silentAudioRef.current.paused && isPlayingRef.current) {
         silentAudioRef.current.play().catch(() => {});
       }
-    }, 4000);
+    }, 3000);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
