@@ -1386,23 +1386,27 @@ export default function App() {
       if (silentAudioRef.current && silentAudioRef.current.paused) {
         silentAudioRef.current.play().catch(() => {});
       }
-      setIsPlaying(true);
+      isPlayingRef.current = true; // sync update BEFORE React re-render
       navigator.mediaSession.playbackState = 'playing';
+      setIsPlaying(true); // async React update for UI
     });
 
     register('pause', () => {
-      if (backgroundAudio) backgroundAudio.pause();
-      // DO NOT pause silentAudio — keep it looping so OS doesn't kill session
-      setIsPlaying(false);
+      isPlayingRef.current = false; // ← sync update FIRST — stops watchdog from restarting audio
       navigator.mediaSession.playbackState = 'paused';
+      if (backgroundAudio) backgroundAudio.pause();
+      // silentAudio intentionally NOT paused — keeps OS session + lock screen notification alive
+      setIsPlaying(false); // async React update (ref already correct above)
     });
 
     // NEXT / PREV — shown as buttons on lock screen
     register('previoustrack', () => {
+      isPlayingRef.current = true;
       if (playPrevRef.current) playPrevRef.current();
       navigator.mediaSession.playbackState = 'playing';
     });
     register('nexttrack', () => {
+      isPlayingRef.current = true;
       if (playNextRef.current) playNextRef.current();
       navigator.mediaSession.playbackState = 'playing';
     });
@@ -1427,9 +1431,10 @@ export default function App() {
       setProgress(details.seekTime);
     });
     register('stop', () => {
-      setIsPlaying(false);
+      isPlayingRef.current = false;
       if (backgroundAudio) backgroundAudio.pause();
       navigator.mediaSession.playbackState = 'none';
+      setIsPlaying(false);
     });
   }, []);
 
