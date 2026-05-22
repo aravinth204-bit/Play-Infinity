@@ -1381,12 +1381,11 @@ export default function App() {
     register('play', () => {
       // Resume suspended AudioContext first (iOS requirement)
       if (audioCtxRef.current?.state === 'suspended') {
-        audioCtxRef.current.resume().then(() => {
-          if (backgroundAudio) backgroundAudio.play().catch(() => {});
-        }).catch(() => {});
-      } else {
-        if (backgroundAudio) backgroundAudio.play().catch(() => {});
+        audioCtxRef.current.resume().catch(() => {});
       }
+      // Always try to play audio — AudioContext resume may fail on Android lock screen
+      // but the audio element can still play independently
+      if (backgroundAudio) backgroundAudio.play().catch(() => {});
       // Keep silent audio alive so browser session stays active
       if (silentAudioRef.current && silentAudioRef.current.paused) {
         silentAudioRef.current.play().catch(() => {});
