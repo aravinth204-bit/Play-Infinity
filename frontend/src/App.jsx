@@ -1395,7 +1395,16 @@ export default function App() {
       isPlayingRef.current = false; // ← sync update FIRST — stops watchdog from restarting audio
       navigator.mediaSession.playbackState = 'paused';
       if (backgroundAudio) backgroundAudio.pause();
-      if (silentAudioRef.current) silentAudioRef.current.pause();
+      
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (silentAudioRef.current) {
+        if (isIOS) {
+          silentAudioRef.current.play().catch(() => {});
+        } else {
+          silentAudioRef.current.pause();
+        }
+      }
+      
       setIsPlaying(false); // async React update (ref already correct above)
     });
 
@@ -1480,7 +1489,14 @@ export default function App() {
         backgroundAudio.play().catch(() => {});
       } else {
         backgroundAudio.pause();
-        if (silentAudioRef.current) silentAudioRef.current.pause();
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        if (silentAudioRef.current) {
+          if (isIOS) {
+            silentAudioRef.current.play().catch(() => {});
+          } else {
+            silentAudioRef.current.pause();
+          }
+        }
       }
     }
   }, [isPlaying, useIframeFallback]);
@@ -1523,8 +1539,11 @@ export default function App() {
       if (document.hidden) {
         // Screen locked / app backgrounded:
         // Keep silent audio playing so OS doesn't suspend audio session
-        if (silentAudioRef.current && silentAudioRef.current.paused && isPlayingRef.current) {
-          silentAudioRef.current.play().catch(() => {});
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        if (silentAudioRef.current && silentAudioRef.current.paused) {
+          if (isPlayingRef.current || isIOS) {
+            silentAudioRef.current.play().catch(() => {});
+          }
         }
         // Don't touch backgroundAudio — let it keep streaming
       } else {
@@ -1608,11 +1627,33 @@ export default function App() {
       backgroundAudio.ontimeupdate = () => setProgress(backgroundAudio.currentTime);
       backgroundAudio.onloadeddata = () => setDuration(backgroundAudio.duration);
       backgroundAudio.onerror = (e) => {
-        console.error("Audio player error:", e);
-        if (!useIframeFallback) setUseIframeFallback(true);
+        const error = backgroundAudio.error;
+        console.error("Audio player error:", error);
+        
+        const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        if (isMobile) {
+          if (error && (error.code === 1 || error.code === 2)) {
+            console.warn("Mobile transient audio error. Attempting auto-recovery...");
+            const currentPos = backgroundAudio.currentTime;
+            if (currentStreamUrl) {
+              backgroundAudio.src = currentStreamUrl;
+              backgroundAudio.load();
+              backgroundAudio.currentTime = currentPos;
+              if (isPlayingRef.current) {
+                backgroundAudio.play().catch(() => {});
+              }
+            }
+          } else {
+            console.error("Fatal audio error on mobile. Skipping to next song...");
+            if (playNextRef.current) playNextRef.current();
+          }
+        } else {
+          if (!useIframeFallback) setUseIframeFallback(true);
+        }
       };
     }
-  }, [useIframeFallback]);
+  }, [useIframeFallback, currentStreamUrl]);
 
   useEffect(() => {
     if (backgroundAudio && currentStreamUrl && !useIframeFallback) {
