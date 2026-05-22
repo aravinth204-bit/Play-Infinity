@@ -1401,13 +1401,10 @@ export default function App() {
       navigator.mediaSession.playbackState = 'paused';
       if (backgroundAudio) backgroundAudio.pause();
       
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-      if (silentAudioRef.current) {
-        if (isIOS) {
-          silentAudioRef.current.play().catch(() => {});
-        } else {
-          silentAudioRef.current.pause();
-        }
+      // Keep silent audio looping on ALL platforms to hold the OS audio session
+      // so the MediaSession notification stays visible on lock screen
+      if (silentAudioRef.current && silentAudioRef.current.paused) {
+        silentAudioRef.current.play().catch(() => {});
       }
       
       setIsPlaying(false); // async React update (ref already correct above)
@@ -1494,13 +1491,9 @@ export default function App() {
         backgroundAudio.play().catch(() => {});
       } else {
         backgroundAudio.pause();
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        if (silentAudioRef.current) {
-          if (isIOS) {
-            silentAudioRef.current.play().catch(() => {});
-          } else {
-            silentAudioRef.current.pause();
-          }
+        // Keep silent audio looping on ALL platforms to hold the OS audio session
+        if (silentAudioRef.current && silentAudioRef.current.paused) {
+          silentAudioRef.current.play().catch(() => {});
         }
       }
     }
@@ -1665,18 +1658,24 @@ export default function App() {
 
   useEffect(() => {
     if (backgroundAudio && currentStreamUrl && !useIframeFallback) {
-      if (isPlaying) {
-        const currentPos = backgroundAudio.currentTime;
-        
-        // Only set src if it's actually different to avoid unnecessary reloads
-        const absoluteUrl = new URL(currentStreamUrl, window.location.href).href;
-        if (backgroundAudio.src !== absoluteUrl) {
-          backgroundAudio.src = currentStreamUrl;
-          if (currentPos > 0) {
-            backgroundAudio.currentTime = currentPos;
-          }
-        }
+      const currentPos = backgroundAudio.currentTime;
+      
+      // Only set src if it's actually different to avoid unnecessary reloads
+      const absoluteUrl = new URL(currentStreamUrl, window.location.href).href;
+      if (backgroundAudio.src !== absoluteUrl) {
+        backgroundAudio.src = currentStreamUrl;
+        const savedProg = parseFloat(localStorage.getItem('savedProgress') || '0');
 
+        // If we are restoring from previous session without auto-playing
+        if (!isPlaying && savedProg > 0) {
+          backgroundAudio.currentTime = savedProg;
+        } else if (isPlaying && currentPos > 0) {
+          // Stream URL upgraded mid-playback, seamlessly continue
+          backgroundAudio.currentTime = currentPos;
+        }
+      }
+
+      if (isPlaying) {
         if (silentAudioRef.current) silentAudioRef.current.play().catch(() => {});
         backgroundAudio.play().catch(e => {
           console.error("URL change play failed", e);
