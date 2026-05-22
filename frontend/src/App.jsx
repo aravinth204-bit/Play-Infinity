@@ -1381,11 +1381,12 @@ export default function App() {
     register('play', () => {
       // Resume suspended AudioContext first (iOS requirement)
       if (audioCtxRef.current?.state === 'suspended') {
-        audioCtxRef.current.resume().catch(() => {});
+        audioCtxRef.current.resume().then(() => {
+          if (backgroundAudio) backgroundAudio.play().catch(() => {});
+        }).catch(() => {});
+      } else {
+        if (backgroundAudio) backgroundAudio.play().catch(() => {});
       }
-      // Always try to play audio — AudioContext resume may fail on Android lock screen
-      // but the audio element can still play independently
-      if (backgroundAudio) backgroundAudio.play().catch(() => {});
       // Keep silent audio alive so browser session stays active
       if (silentAudioRef.current && silentAudioRef.current.paused) {
         silentAudioRef.current.play().catch(() => {});
@@ -1400,10 +1401,13 @@ export default function App() {
       navigator.mediaSession.playbackState = 'paused';
       if (backgroundAudio) backgroundAudio.pause();
       
-      // Keep silent audio looping on ALL platforms to hold the OS audio session
-      // so the MediaSession notification stays visible on lock screen
-      if (silentAudioRef.current && silentAudioRef.current.paused) {
-        silentAudioRef.current.play().catch(() => {});
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (silentAudioRef.current) {
+        if (isIOS) {
+          silentAudioRef.current.play().catch(() => {});
+        } else {
+          silentAudioRef.current.pause();
+        }
       }
       
       setIsPlaying(false); // async React update (ref already correct above)
@@ -1447,7 +1451,7 @@ export default function App() {
       navigator.mediaSession.playbackState = 'none';
       setIsPlaying(false);
     });
-  }, []);
+  }, [currentSong?.id]);
 
   // Update MediaSession metadata when song changes (lock screen title + artwork + next/prev)
   useEffect(() => {
@@ -1490,9 +1494,13 @@ export default function App() {
         backgroundAudio.play().catch(() => {});
       } else {
         backgroundAudio.pause();
-        // Keep silent audio looping on ALL platforms to hold the OS audio session
-        if (silentAudioRef.current && silentAudioRef.current.paused) {
-          silentAudioRef.current.play().catch(() => {});
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        if (silentAudioRef.current) {
+          if (isIOS) {
+            silentAudioRef.current.play().catch(() => {});
+          } else {
+            silentAudioRef.current.pause();
+          }
         }
       }
     }
