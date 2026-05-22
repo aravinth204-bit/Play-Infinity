@@ -1495,12 +1495,8 @@ export default function App() {
       } else {
         backgroundAudio.pause();
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        if (silentAudioRef.current) {
-          if (isIOS) {
-            silentAudioRef.current.play().catch(() => {});
-          } else {
-            silentAudioRef.current.pause();
-          }
+        if (silentAudioRef.current && !isIOS) {
+          silentAudioRef.current.pause();
         }
       }
     }
@@ -1686,7 +1682,8 @@ export default function App() {
         if (silentAudioRef.current) silentAudioRef.current.play().catch(() => {});
         backgroundAudio.play().catch(e => {
           console.error("URL change play failed", e);
-          if (!useIframeFallback) setUseIframeFallback(true);
+          const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          if (!isMobile && !useIframeFallback) setUseIframeFallback(true);
         });
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
       } else {
