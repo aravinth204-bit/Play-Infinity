@@ -178,6 +178,11 @@ export default function App() {
   const [isLyricsVisible, setIsLyricsVisible] = useState(false);
   const sleepTimerRef = useRef(null);
 
+  // Desktop right panel tab: 'info' | 'lyrics'
+  const [desktopRightTab, setDesktopRightTab] = useState('info');
+  const [desktopLyrics, setDesktopLyrics] = useState(null);   // null = not fetched, '' = fetching, string = result
+  const [lyricsLoading, setLyricsLoading] = useState(false);
+
   // PREMIUM INTERACTIVE FEATURES (Insta Story, Swipe, Profile, Visualizer)
   const [visualizerMode, setVisualizerMode] = useState(0); // 0=Equalizer, 1=Halo Only, 2=Off
   const [showShareCard, setShowShareCard] = useState(false);
@@ -1333,6 +1338,52 @@ export default function App() {
       }
     } catch { }
   };
+
+  // ── Desktop Lyrics Fetch ────────────────────────────────────────────────────
+  // Uses lyrics.ovh (free, no key needed). Falls back to a friendly message.
+  const fetchDesktopLyrics = useCallback(async (song) => {
+    if (!song) return;
+    setLyricsLoading(true);
+    setDesktopLyrics('');
+    try {
+      // Clean artist & title for the API
+      const artist = (song.artist || '')
+        .replace(/ - Topic| VEVO/gi, '')
+        .replace(/[^\w\s]/g, '')
+        .trim();
+      const title = cleanTitle(song.title).replace(/[^\w\s]/g, '').trim();
+
+      if (!artist || !title) throw new Error('missing fields');
+
+      const res = await fetch(
+        `https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(title)}`
+      );
+      if (!res.ok) throw new Error('not found');
+      const data = await res.json();
+      if (data.lyrics) {
+        setDesktopLyrics(data.lyrics.trim());
+      } else {
+        throw new Error('empty');
+      }
+    } catch {
+      setDesktopLyrics(null); // null = not available
+    } finally {
+      setLyricsLoading(false);
+    }
+  }, []);
+
+  // Auto-fetch lyrics when song changes and lyrics tab is active
+  useEffect(() => {
+    if (desktopRightTab === 'lyrics' && currentSong) {
+      fetchDesktopLyrics(currentSong);
+    }
+  }, [currentSong?.id, desktopRightTab]);
+
+  // Reset lyrics when song changes
+  useEffect(() => {
+    setDesktopLyrics(null);
+    setLyricsLoading(false);
+  }, [currentSong?.id]);
 
 
   const handleProgress = (state) => {
@@ -3255,271 +3306,692 @@ export default function App() {
 
         {/* MIDDLE COLUMN */}
         <div className="flex-1 flex flex-col overflow-hidden bg-[#121422]">
-          {/* Top Bar */}
-          <div className="flex items-center justify-between px-8 pt-8 pb-4 shrink-0">
-            <div>
-              <p className="text-[#6b6f80] text-xs font-bold uppercase tracking-widest">
+          {/* Top Bar — with Search always visible at top */}
+          <div className="flex items-center gap-4 px-8 pt-6 pb-4 shrink-0 border-b border-[#1a1c2a]">
+            {/* Greeting + Title */}
+            <div className="shrink-0">
+              <p className="text-[#6b6f80] text-[10px] font-black uppercase tracking-widest">
                 {(() => { const h = new Date().getHours(); return h < 12 ? 'Good Morning ☀️' : h < 17 ? 'Good Afternoon 🌤️' : h < 21 ? 'Good Evening 🌆' : 'Good Night 🌙'; })()}
               </p>
-              <h1 className="text-white text-xl font-black mt-0.5">Explore and see what's trending today</h1>
+              <h1 className="text-white text-base font-black mt-0.5 whitespace-nowrap">Explore &amp; Discover</h1>
             </div>
-            <div className="flex items-center gap-3">
-              <button onClick={() => setActiveTab('Search')} className="w-10 h-10 bg-[#1a1c2a] rounded-full flex items-center justify-center text-[#6b6f80] hover:text-white transition-all border border-[#262837]">
-                <Search size={17} />
-              </button>
-              <button onClick={() => setActiveTab('Profile')} className="w-10 h-10 bg-[#1a1c2a] rounded-full flex items-center justify-center text-[#6b6f80] hover:text-white transition-all border border-[#262837]">
-                <User size={17} />
-              </button>
-            </div>
-          </div>
 
-          <div className="flex-1 overflow-y-auto no-scrollbar px-8 pb-8">
-            {/* Search Bar */}
-            <form onSubmit={searchYoutube} className="mb-7 shrink-0">
-              <div className="relative max-w-lg">
-                <Search className="absolute left-4 top-3.5 text-gray-500" size={16} />
+            {/* Search Bar — center/fill */}
+            <form onSubmit={searchYoutube} className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#4a4f62]" size={15} />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Songs, artists, moods..."
-                  className="w-full bg-[#1a1c2a] pl-11 pr-4 py-3 rounded-xl outline-none focus:ring-1 text-white text-sm border border-[#262837] focus:border-transparent"
+                  className="w-full bg-[#1a1c2a] pl-10 pr-4 py-2.5 rounded-xl outline-none text-white text-sm border border-[#262837] focus:border-[#3a3d52] transition-colors"
                   style={{ outline: 'none' }}
                 />
               </div>
             </form>
 
-            {/* Music Directors Section */}
-            <div className="mb-7">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-white font-bold text-base">Music Directors</h2>
-                <span className="text-xs font-bold uppercase tracking-widest" style={{ color: dominantColor }}>See all</span>
-              </div>
-              <div className="flex gap-5 overflow-x-auto no-scrollbar pb-1">
-                {MUSIC_DIRECTORS.slice(0, 6).map((director) => (
-                  <button
-                    key={director.id}
-                    onClick={() => fetchDirectorSongs(director)}
-                    className="flex flex-col items-center gap-2 shrink-0 group cursor-pointer"
-                  >
-                    <div
-                      className="w-[72px] h-[72px] rounded-full overflow-hidden shadow-lg relative transition-all group-hover:scale-105"
-                      style={{ border: `2.5px solid ${director.accentColor}66` }}
-                    >
-                      <img src={director.photo} alt={director.name} className="w-full h-full object-cover object-top" onError={(e) => { e.target.style.display = 'none'; }} />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                    </div>
-                    <span className="text-[11px] font-semibold text-white/70 group-hover:text-white transition-colors w-16 text-center truncate leading-tight">{director.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Top Playlists */}
-            <div className="mb-7">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-white font-bold text-base">Top playlists</h2>
-                <button onClick={() => setActiveTab('Playlists')} className="text-xs font-bold uppercase tracking-widest transition-colors" style={{ color: dominantColor }}>See all</button>
-              </div>
-              {/* Featured playlist card */}
-              {(currentSong || trendingSongs[0]) && (
-                <div
-                  onClick={() => currentSong ? setIsPlayerExpanded(true) : playSong(trendingSongs[0])}
-                  className="relative rounded-2xl overflow-hidden cursor-pointer group transition-all hover:scale-[1.01] active:scale-[0.99]"
-                  style={{ background: `linear-gradient(135deg, ${dominantColor}33 0%, #1a1c2a 100%)`, border: `1px solid ${dominantColor}33` }}
-                >
-                  <div className="flex items-start gap-4 p-5">
-                    <div className="w-28 h-28 rounded-xl overflow-hidden shadow-xl shrink-0">
-                      <img
-                        src={currentSong?.thumbnail || trendingSongs[0]?.thumbnail || '/logo.png'}
-                        alt=""
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0 pt-1">
-                      <h3 className="text-white font-bold text-base leading-snug mb-1 line-clamp-2">
-                        {currentSong ? cleanTitle(currentSong.title) : (trendingSongs[0]?.title || 'Chartbuster Tamil Hits')}
-                      </h3>
-                      <p className="text-[#6b6f80] text-xs font-medium truncate">
-                        {currentSong?.artist?.replace(/ - Topic| VEVO/gi, '') || trendingSongs[0]?.artist || 'Various Artists'}
-                      </p>
-                      <div className="flex items-center gap-3 mt-4">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); currentSong ? togglePlay() : (trendingSongs[0] && playSong(trendingSongs[0])); }}
-                          className="w-9 h-9 rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110 active:scale-90"
-                          style={{ backgroundColor: dominantColor }}
-                        >
-                          {isPlaying && currentSong ? <Pause size={16} fill="#121422" className="text-[#121422]" /> : <Play size={16} fill="#121422" className="text-[#121422] ml-0.5" />}
-                        </button>
-                        <AnimatedHeart size={18} isFavorite={currentSong ? favoriteIds.has(currentSong.id) : false} onClick={(e) => currentSong && toggleFavorite(e, currentSong)} />
-                        <button className="text-[#6b6f80] hover:text-white transition-colors">
-                          <Download size={16} />
-                        </button>
-                        <button className="text-[#6b6f80] hover:text-white transition-colors">
-                          <MoreHorizontal size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  {/* Mini Progress Bar inside card */}
-                  {currentSong && (
-                    <div className="px-5 pb-4">
-                      <div className="flex items-center gap-3 text-[10px] text-[#6b6f80] font-mono">
-                        <span>{formatTime(progress)}</span>
-                        <div className="flex-1 h-1 bg-[#262837] rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all duration-200" style={{ width: `${(progress / (duration || 1)) * 100}%`, backgroundColor: dominantColor }} />
-                        </div>
-                        <span>{formatTime(duration)}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Top daily songs / Song List */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-white font-bold text-base">
-                  {songs.length > 0 ? 'Search Results' : 'Top daily songs'}
-                </h2>
-              </div>
-              <div className="space-y-0.5">
-                {(songs.length > 0 ? songs : (trendingSongs.length > 0 ? trendingSongs : fallbackSongs)).slice(0, 12).map((song, idx) => (
-                  <div
-                    key={song.id || idx}
-                    onClick={() => playSong(song)}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all hover:bg-[#1a1c2a] group border border-transparent hover:border-[#262837]"
-                  >
-                    <div className="relative shrink-0">
-                      <img src={song.thumbnail} alt="" className="w-11 h-11 rounded-lg object-cover shadow-sm" />
-                      {currentSong?.id === song.id && isPlaying && (
-                        <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
-                          <div className="flex gap-[2px] items-end h-4">
-                            {[0,1,2].map(b => <div key={b} className="w-[2px] rounded-full animate-bounce" style={{ height: `${6+b*3}px`, backgroundColor: dominantColor, animationDelay: `${b*0.1}s` }} />)}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-white text-[13px] font-semibold truncate leading-snug">{cleanTitle(song.title)}</h4>
-                      <p className="text-[#6b6f80] text-[11px] truncate mt-0.5">{song.artist?.replace(/ - Topic| VEVO/gi, '')}</p>
-                    </div>
-                    {currentSong?.id === song.id && (
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: dominantColor }} />
-                    )}
-                    <button onClick={(e) => { e.stopPropagation(); setShowSongOptions(song); }} className="text-[#6b6f80] hover:text-white transition-colors shrink-0 opacity-0 group-hover:opacity-100">
-                      <MoreVertical size={15} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* Profile icon */}
+            <button onClick={() => setActiveTab('Profile')} className="w-9 h-9 bg-[#1a1c2a] rounded-full flex items-center justify-center text-[#6b6f80] hover:text-white transition-all border border-[#262837] shrink-0">
+              <User size={16} />
+            </button>
           </div>
-        </div>
 
-        {/* RIGHT SIDEBAR — Now Playing */}
-        <div className="w-[320px] bg-[#1a1c2a] flex flex-col pt-8 pb-6 border-l border-[#262837] shrink-0 z-10">
-          {currentSong ? (
-            <div className="flex flex-col h-full px-6 overflow-y-auto no-scrollbar">
-              {/* Mini player controls row */}
-              <div className="flex items-center justify-between mb-6 shrink-0">
-                <div className="flex items-center gap-2">
-                  <button onClick={playPrev} className="w-8 h-8 flex items-center justify-center text-[#6b6f80] hover:text-white transition-all">
-                    <SkipBack size={18} fill="currentColor" />
-                  </button>
-                  <button
-                    onClick={togglePlay}
-                    className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-105 active:scale-90"
-                    style={{ backgroundColor: dominantColor }}
-                  >
-                    {isPlaying ? <Pause size={18} fill="#121422" className="text-[#121422]" /> : <Play size={18} fill="#121422" className="text-[#121422] ml-0.5" />}
-                  </button>
-                  <button onClick={playNext} className="w-8 h-8 flex items-center justify-center text-[#6b6f80] hover:text-white transition-all">
-                    <SkipForward size={18} fill="currentColor" />
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button className="text-[#6b6f80] hover:text-white transition-all">
-                    <Shuffle size={16} />
-                  </button>
-                  <button className="text-[#6b6f80] hover:text-white transition-all">
-                    <Repeat size={16} />
-                  </button>
-                </div>
-              </div>
+          <div className="flex-1 overflow-y-auto no-scrollbar px-8 pb-8 pt-6">
 
-              {/* Album Art */}
-              <div
-                className="w-full aspect-square rounded-2xl overflow-hidden shadow-2xl mb-5 shrink-0 relative"
-                style={{ boxShadow: isPlaying ? `0 20px 60px ${dominantColor}55` : '0 20px 40px rgba(0,0,0,0.5)' }}
-              >
-                <img src={getHighResImage(currentSong.thumbnail)} alt="" className={`w-full h-full object-cover ${isPlaying ? 'scale-[1.02]' : 'scale-100'} transition-transform duration-500`} />
-                {/* Equalizer overlay */}
-                {isPlaying && (
-                  <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/70 to-transparent flex items-end justify-center gap-[2px] px-6 pb-3">
-                    {Array.from({ length: 20 }).map((_, i) => {
-                      const val = audioData[i % (audioData.length || 1)] || 0;
-                      return (
-                        <div key={i} className="flex-1 max-w-[4px] rounded-full transition-all duration-100"
-                          style={{ height: `${Math.max(10, (val / 255) * 90)}%`, backgroundColor: dominantColor, opacity: 0.85 }} />
-                      );
-                    })}
+            {/* ═══ HOME / EXPLORE TAB ═══ */}
+            {activeTab === 'Home' && (
+              <div className="animate-fade-in">
+                {/* Music Directors */}
+                <div className="mb-7">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-white font-bold text-base">Music Directors</h2>
+                    <span className="text-xs font-bold uppercase tracking-widest" style={{ color: dominantColor }}>See all</span>
                   </div>
-                )}
-              </div>
-
-              {/* Song Info */}
-              <div className="flex items-start justify-between mb-4 shrink-0">
-                <div className="flex-1 min-w-0 pr-2">
-                  <h3 className="text-white font-bold text-base leading-tight truncate">{cleanTitle(currentSong.title)}</h3>
-                  <p className="text-[#6b6f80] text-sm truncate mt-0.5">{currentSong.artist?.replace(/ - Topic| VEVO/gi, '')}</p>
-                </div>
-                <AnimatedHeart size={20} isFavorite={favoriteIds.has(currentSong.id)} onClick={(e) => toggleFavorite(e, currentSong)} />
-              </div>
-
-              {/* Progress Bar */}
-              <div className="mb-4 shrink-0">
-                <input
-                  type="range"
-                  min={0}
-                  max={duration || 1}
-                  value={progress}
-                  onChange={handleSeek}
-                  className="w-full h-1 rounded-full appearance-none cursor-pointer"
-                  style={{ accentColor: dominantColor, background: `linear-gradient(to right, ${dominantColor} ${(progress/(duration||1))*100}%, #262837 ${(progress/(duration||1))*100}%)` }}
-                />
-                <div className="flex justify-between mt-1.5">
-                  <span className="text-[#6b6f80] text-[10px] font-mono">{formatTime(progress)}</span>
-                  <span className="text-[#6b6f80] text-[10px] font-mono">{formatTime(duration)}</span>
-                </div>
-              </div>
-
-              {/* Queue / Up Next */}
-              {queue.length > 0 && (
-                <div className="mt-2 flex-1 min-h-0">
-                  <h4 className="text-[#6b6f80] text-[10px] font-bold uppercase tracking-widest mb-2">Up Next</h4>
-                  <div className="space-y-1 overflow-y-auto no-scrollbar">
-                    {queue.slice(0, 5).map((song, i) => (
-                      <div key={`q-${i}`} onClick={() => playSong(song)} className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-[#262837] cursor-pointer transition-all group">
-                        <img src={song.thumbnail} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white text-[11px] font-semibold truncate">{cleanTitle(song.title)}</p>
-                          <p className="text-[#6b6f80] text-[10px] truncate">{song.artist?.replace(/ - Topic| VEVO/gi, '')}</p>
+                  <div className="flex gap-5 overflow-x-auto no-scrollbar pb-1">
+                    {MUSIC_DIRECTORS.slice(0, 6).map((director) => (
+                      <button
+                        key={director.id}
+                        onClick={() => fetchDirectorSongs(director)}
+                        className="flex flex-col items-center gap-2 shrink-0 group cursor-pointer"
+                      >
+                        <div
+                          className="w-[72px] h-[72px] rounded-full overflow-hidden shadow-lg relative transition-all group-hover:scale-105"
+                          style={{ border: `2.5px solid ${director.accentColor}66` }}
+                        >
+                          <img src={director.photo} alt={director.name} className="w-full h-full object-cover object-top" onError={(e) => { e.target.style.display = 'none'; }} />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                         </div>
-                      </div>
+                        <span className="text-[11px] font-semibold text-white/70 group-hover:text-white transition-colors w-16 text-center truncate leading-tight">{director.name}</span>
+                      </button>
                     ))}
                   </div>
                 </div>
-              )}
+
+                {/* Up Next / Queue */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-white font-bold text-base flex items-center gap-2">
+                      <List size={15} className="inline-block" style={{ color: dominantColor }} /> Up Next
+                    </h2>
+                    {isFetchingQueue && (
+                      <div className="w-3 h-3 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: dominantColor, borderTopColor: 'transparent' }} />
+                    )}
+                  </div>
+
+                  <div className="space-y-0.5">
+                    {(() => {
+                      const displayList = queue.length > 0 ? queue : (trendingSongs.length > 0 ? trendingSongs : fallbackSongs);
+                      return displayList.slice(0, 15).map((song, idx) => (
+                        <div
+                          key={song.id || idx}
+                          onClick={() => playSong(song, queue.length > 0)}
+                          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all group border border-transparent hover:border-[#262837] ${
+                            currentSong?.id === song.id ? 'bg-[#1a1c2a] border-[#262837]' : 'hover:bg-[#1a1c2a]'
+                          }`}
+                        >
+                          <span className="text-[11px] font-bold text-[#3a3d52] w-5 text-center shrink-0 group-hover:hidden">
+                            {currentSong?.id === song.id ? '' : idx + 1}
+                          </span>
+                          <Play size={11} fill="currentColor" className="text-[#6b6f80] shrink-0 hidden group-hover:block w-5" />
+
+                          <div className="relative shrink-0">
+                            <img src={song.thumbnail} alt="" className="w-10 h-10 rounded-lg object-cover shadow-sm" />
+                            {currentSong?.id === song.id && isPlaying && (
+                              <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
+                                <div className="flex gap-[2px] items-end h-3.5">
+                                  {[0,1,2].map(b => (
+                                    <div key={b} className="w-[2px] rounded-full animate-bounce"
+                                      style={{ height: `${5+b*3}px`, backgroundColor: dominantColor, animationDelay: `${b*0.12}s` }} />
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <h4 className={`text-[13px] font-semibold truncate leading-snug ${currentSong?.id === song.id ? 'text-white' : 'text-white/80'}`}
+                              style={currentSong?.id === song.id ? { color: dominantColor } : {}}>
+                              {cleanTitle(song.title)}
+                            </h4>
+                            <p className="text-[#6b6f80] text-[11px] truncate mt-0.5">{song.artist?.replace(/ - Topic| VEVO/gi, '')}</p>
+                          </div>
+
+                          {song.durationSeconds > 0 && (
+                            <span className="text-[10px] text-[#3a3d52] font-mono shrink-0 group-hover:hidden">
+                              {Math.floor(song.durationSeconds / 60)}:{String(song.durationSeconds % 60).padStart(2,'0')}
+                            </span>
+                          )}
+
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setShowSongOptions(song); }}
+                            className="text-[#6b6f80] hover:text-white transition-colors shrink-0 opacity-0 group-hover:opacity-100 p-1"
+                          >
+                            <MoreVertical size={14} />
+                          </button>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ═══ SEARCH TAB ═══ */}
+            {activeTab === 'Search' && (
+              <div className="animate-fade-in">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-white font-bold text-base flex items-center gap-2">
+                    {songs.length > 0 && <><Search size={15} style={{ color: dominantColor }} /> Search Results <span className="text-[11px] font-normal text-[#6b6f80]">({songs.length})</span></>}
+                    {songs.length === 0 && <>Search for songs</>}
+                  </h2>
+                  {loading && <div className="w-3 h-3 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: dominantColor, borderTopColor: 'transparent' }} />}
+                </div>
+
+                {songs.length > 0 ? (
+                  <div className="space-y-0.5">
+                    {songs.slice(0, 20).map((song, idx) => (
+                      <div
+                        key={song.id || idx}
+                        onClick={() => playSong(song)}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all group border border-transparent hover:border-[#262837] ${
+                          currentSong?.id === song.id ? 'bg-[#1a1c2a] border-[#262837]' : 'hover:bg-[#1a1c2a]'
+                        }`}
+                      >
+                        <span className="text-[11px] font-bold text-[#3a3d52] w-5 text-center shrink-0 group-hover:hidden">
+                          {currentSong?.id === song.id ? '' : idx + 1}
+                        </span>
+                        <Play size={11} fill="currentColor" className="text-[#6b6f80] shrink-0 hidden group-hover:block w-5" />
+
+                        <div className="relative shrink-0">
+                          <img src={song.thumbnail} alt="" className="w-10 h-10 rounded-lg object-cover shadow-sm" />
+                          {currentSong?.id === song.id && isPlaying && (
+                            <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
+                              <div className="flex gap-[2px] items-end h-3.5">
+                                {[0,1,2].map(b => (
+                                  <div key={b} className="w-[2px] rounded-full animate-bounce"
+                                    style={{ height: `${5+b*3}px`, backgroundColor: dominantColor, animationDelay: `${b*0.12}s` }} />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <h4 className={`text-[13px] font-semibold truncate leading-snug ${currentSong?.id === song.id ? 'text-white' : 'text-white/80'}`}
+                            style={currentSong?.id === song.id ? { color: dominantColor } : {}}>
+                            {cleanTitle(song.title)}
+                          </h4>
+                          <p className="text-[#6b6f80] text-[11px] truncate mt-0.5">{song.artist?.replace(/ - Topic| VEVO/gi, '')}</p>
+                        </div>
+
+                        {song.durationSeconds > 0 && (
+                          <span className="text-[10px] text-[#3a3d52] font-mono shrink-0 group-hover:hidden">
+                            {Math.floor(song.durationSeconds / 60)}:{String(song.durationSeconds % 60).padStart(2,'0')}
+                          </span>
+                        )}
+
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setShowSongOptions(song); }}
+                          className="text-[#6b6f80] hover:text-white transition-colors shrink-0 opacity-0 group-hover:opacity-100 p-1"
+                        >
+                          <MoreVertical size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ backgroundColor: `${dominantColor}22` }}>
+                      <Search size={32} style={{ color: dominantColor }} />
+                    </div>
+                    <p className="text-white/60 text-sm">Use the search bar above to find songs</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ═══ FAVORITES TAB ═══ */}
+            {activeTab === 'Favorites' && (
+              <div className="animate-fade-in">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-white font-bold text-base flex items-center gap-2">
+                    <Heart size={15} fill={dominantColor} style={{ color: dominantColor }} /> Liked Songs
+                    {favorites.length > 0 && <span className="text-[11px] font-normal text-[#6b6f80]">({favorites.length})</span>}
+                  </h2>
+                </div>
+
+                {favorites.length > 0 ? (
+                  <div className="space-y-0.5">
+                    {favorites.map((song, idx) => (
+                      <div
+                        key={song.id || idx}
+                        onClick={() => playSong(song)}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all group border border-transparent hover:border-[#262837] ${
+                          currentSong?.id === song.id ? 'bg-[#1a1c2a] border-[#262837]' : 'hover:bg-[#1a1c2a]'
+                        }`}
+                      >
+                        <span className="text-[11px] font-bold text-[#3a3d52] w-5 text-center shrink-0 group-hover:hidden">
+                          {currentSong?.id === song.id ? '' : idx + 1}
+                        </span>
+                        <Play size={11} fill="currentColor" className="text-[#6b6f80] shrink-0 hidden group-hover:block w-5" />
+
+                        <div className="relative shrink-0">
+                          <img src={song.thumbnail} alt="" className="w-10 h-10 rounded-lg object-cover shadow-sm" />
+                          {currentSong?.id === song.id && isPlaying && (
+                            <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
+                              <div className="flex gap-[2px] items-end h-3.5">
+                                {[0,1,2].map(b => (
+                                  <div key={b} className="w-[2px] rounded-full animate-bounce"
+                                    style={{ height: `${5+b*3}px`, backgroundColor: dominantColor, animationDelay: `${b*0.12}s` }} />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <h4 className={`text-[13px] font-semibold truncate leading-snug ${currentSong?.id === song.id ? 'text-white' : 'text-white/80'}`}
+                            style={currentSong?.id === song.id ? { color: dominantColor } : {}}>
+                            {cleanTitle(song.title)}
+                          </h4>
+                          <p className="text-[#6b6f80] text-[11px] truncate mt-0.5">{song.artist?.replace(/ - Topic| VEVO/gi, '')}</p>
+                        </div>
+
+                        {song.durationSeconds > 0 && (
+                          <span className="text-[10px] text-[#3a3d52] font-mono shrink-0 group-hover:hidden">
+                            {Math.floor(song.durationSeconds / 60)}:{String(song.durationSeconds % 60).padStart(2,'0')}
+                          </span>
+                        )}
+
+                        <AnimatedHeart size={16} isFavorite={true} onClick={(e) => toggleFavorite(e, song)} className="shrink-0" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ backgroundColor: `${dominantColor}22` }}>
+                      <Heart size={32} style={{ color: dominantColor }} />
+                    </div>
+                    <p className="text-white font-bold text-sm mb-1">No liked songs yet</p>
+                    <p className="text-[#6b6f80] text-xs max-w-[200px]">Songs you like will appear here</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ═══ HISTORY / DOWNLOADS TAB ═══ */}
+            {activeTab === 'History' && (
+              <div className="animate-fade-in">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-white font-bold text-base flex items-center gap-2">
+                    <Clock size={15} style={{ color: dominantColor }} /> Listen History
+                    {listenHistory.length > 0 && <span className="text-[11px] font-normal text-[#6b6f80]">({listenHistory.length})</span>}
+                  </h2>
+                </div>
+
+                {listenHistory.length > 0 ? (
+                  <div className="space-y-0.5">
+                    {listenHistory.map((song, idx) => (
+                      <div
+                        key={song.id || idx}
+                        onClick={() => playSong(song)}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all group border border-transparent hover:border-[#262837] ${
+                          currentSong?.id === song.id ? 'bg-[#1a1c2a] border-[#262837]' : 'hover:bg-[#1a1c2a]'
+                        }`}
+                      >
+                        <span className="text-[11px] font-bold text-[#3a3d52] w-5 text-center shrink-0 group-hover:hidden">
+                          {currentSong?.id === song.id ? '' : idx + 1}
+                        </span>
+                        <Play size={11} fill="currentColor" className="text-[#6b6f80] shrink-0 hidden group-hover:block w-5" />
+
+                        <div className="relative shrink-0">
+                          <img src={song.thumbnail} alt="" className="w-10 h-10 rounded-lg object-cover shadow-sm" />
+                          {currentSong?.id === song.id && isPlaying && (
+                            <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
+                              <div className="flex gap-[2px] items-end h-3.5">
+                                {[0,1,2].map(b => (
+                                  <div key={b} className="w-[2px] rounded-full animate-bounce"
+                                    style={{ height: `${5+b*3}px`, backgroundColor: dominantColor, animationDelay: `${b*0.12}s` }} />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <h4 className={`text-[13px] font-semibold truncate leading-snug ${currentSong?.id === song.id ? 'text-white' : 'text-white/80'}`}
+                            style={currentSong?.id === song.id ? { color: dominantColor } : {}}>
+                            {cleanTitle(song.title)}
+                          </h4>
+                          <p className="text-[#6b6f80] text-[11px] truncate mt-0.5">{song.artist?.replace(/ - Topic| VEVO/gi, '')}</p>
+                        </div>
+
+                        {song.playedAt && (
+                          <span className="text-[10px] text-[#3a3d52] font-mono shrink-0 group-hover:hidden">
+                            {new Date(song.playedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                          </span>
+                        )}
+
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setShowSongOptions(song); }}
+                          className="text-[#6b6f80] hover:text-white transition-colors shrink-0 opacity-0 group-hover:opacity-100 p-1"
+                        >
+                          <MoreVertical size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ backgroundColor: `${dominantColor}22` }}>
+                      <Clock size={32} style={{ color: dominantColor }} />
+                    </div>
+                    <p className="text-white font-bold text-sm mb-1">No history yet</p>
+                    <p className="text-[#6b6f80] text-xs max-w-[200px]">Songs you play will be tracked here</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+          </div>
+        </div>
+
+        {/* RIGHT PANEL — Now Playing (Redesigned) */}
+        <div className="w-[340px] bg-[#0f1018] flex flex-col border-l border-[#1e2030] shrink-0 z-10 overflow-hidden">
+          {currentSong ? (
+            <div className="flex flex-col h-full overflow-hidden">
+
+              {/* ── TOP: Song Details (left) + Album Art (right) ── */}
+              <div
+                className="relative shrink-0 px-5 pt-6 pb-5 overflow-hidden"
+                style={{ background: `linear-gradient(135deg, ${dominantColor}18 0%, #0f1018 80%)` }}
+              >
+                {/* Blurred ambient background */}
+                <div
+                  className="absolute inset-0 opacity-20 blur-[60px] pointer-events-none scale-150"
+                  style={{ background: `radial-gradient(circle at 70% 30%, ${dominantColor} 0%, transparent 70%)` }}
+                />
+
+                <div className="relative z-10 flex items-start gap-3">
+                  {/* LEFT: Song details */}
+                  <div className="flex-1 min-w-0 pt-1">
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] mb-1.5" style={{ color: dominantColor }}>Now Playing</p>
+                    <h3 className="text-white font-black text-[15px] leading-snug line-clamp-2 mb-1">
+                      {cleanTitle(currentSong.title)}
+                    </h3>
+                    <p className="text-[#6b6f80] text-[12px] font-medium truncate mb-3">
+                      {currentSong.artist?.replace(/ - Topic| VEVO/gi, '') || 'Unknown Artist'}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <AnimatedHeart size={16} isFavorite={favoriteIds.has(currentSong.id)} onClick={(e) => toggleFavorite(e, currentSong)} />
+                      <button className="text-[#6b6f80] hover:text-white transition-colors">
+                        <Share2 size={15} onClick={() => shareSong(currentSong)} />
+                      </button>
+                      <button className="text-[#6b6f80] hover:text-white transition-colors">
+                        <MoreHorizontal size={15} onClick={() => setShowSongOptions(currentSong)} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* RIGHT: Album Art */}
+                  <div
+                    className="w-[88px] h-[88px] rounded-2xl overflow-hidden shadow-2xl shrink-0 relative"
+                    style={{
+                      boxShadow: isPlaying
+                        ? `0 8px 32px ${dominantColor}66, 0 0 0 2px ${dominantColor}44`
+                        : '0 8px 24px rgba(0,0,0,0.6)'
+                    }}
+                  >
+                    <img
+                      src={getHighResImage(currentSong.thumbnail)}
+                      alt=""
+                      className={`w-full h-full object-cover transition-transform duration-700 ${isPlaying ? 'scale-[1.05]' : 'scale-100'}`}
+                    />
+                    {/* Spinning indicator ring when playing */}
+                    {isPlaying && (
+                      <div
+                        className="absolute inset-0 rounded-2xl border-2 border-transparent pointer-events-none"
+                        style={{ borderTopColor: dominantColor, animation: 'spin 3s linear infinite' }}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── MIDDLE: Controls + Equalizer ── */}
+              <div className="shrink-0 px-5 py-4 bg-[#0f1018]">
+                {/* Progress Bar */}
+                <div className="mb-3">
+                  <div className="relative w-full h-[5px] bg-[#1e2030] rounded-full mb-1.5 cursor-pointer group">
+                    <input
+                      type="range"
+                      min={0}
+                      max={duration || 1}
+                      value={progress}
+                      onChange={handleSeek}
+                      className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer"
+                    />
+                    <div
+                      className="h-full rounded-full transition-all duration-200 pointer-events-none"
+                      style={{
+                        width: `${(progress / (duration || 1)) * 100}%`,
+                        backgroundColor: dominantColor,
+                        boxShadow: `0 0 8px ${dominantColor}88`
+                      }}
+                    />
+                    {/* Thumb */}
+                    <div
+                      className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full shadow-lg pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{
+                        left: `calc(${(progress / (duration || 1)) * 100}% - 6px)`,
+                        backgroundColor: dominantColor
+                      }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] text-[#4a4f62] font-mono font-bold">
+                    <span>{formatTime(progress)}</span>
+                    <span>{formatTime(duration)}</span>
+                  </div>
+                </div>
+
+                {/* Music Controls */}
+                <div className="flex items-center justify-between mb-4">
+                  <button className="text-[#4a4f62] hover:text-white transition-all active:scale-75 p-1">
+                    <Shuffle size={16} />
+                  </button>
+                  <button onClick={playPrev} className="text-[#a0a3b1] hover:text-white transition-all active:scale-75 p-1">
+                    <SkipBack size={22} fill="currentColor" />
+                  </button>
+                  <button
+                    onClick={togglePlay}
+                    className="w-[52px] h-[52px] rounded-full flex items-center justify-center shadow-xl transition-all hover:scale-105 active:scale-90"
+                    style={{ backgroundColor: dominantColor, boxShadow: isPlaying ? `0 0 24px ${dominantColor}88` : 'none' }}
+                  >
+                    {isPlaying
+                      ? <Pause size={22} fill="#0f1018" className="text-[#0f1018]" />
+                      : <Play size={22} fill="#0f1018" className="text-[#0f1018] ml-0.5" />
+                    }
+                  </button>
+                  <button onClick={playNext} className="text-[#a0a3b1] hover:text-white transition-all active:scale-75 p-1">
+                    <SkipForward size={22} fill="currentColor" />
+                  </button>
+                  <button className="text-[#4a4f62] hover:text-white transition-all active:scale-75 p-1">
+                    <Repeat size={16} />
+                  </button>
+                </div>
+
+                {/* Equalizer Bars */}
+                <div className="flex items-end justify-center gap-[2.5px] h-10 px-2">
+                  {Array.from({ length: 32 }).map((_, i) => {
+                    const val = audioData[i % (audioData.length || 1)] || 0;
+                    const heightPct = isPlaying
+                      ? Math.max(8, (val / 255) * 100)
+                      : 8 + Math.sin(Date.now() / 800 + i * 0.4) * 4;
+                    return (
+                      <div
+                        key={i}
+                        className="flex-1 max-w-[5px] rounded-full transition-all"
+                        style={{
+                          height: `${heightPct}%`,
+                          backgroundColor: dominantColor,
+                          opacity: isPlaying ? 0.75 + (val / 255) * 0.25 : 0.2,
+                          transitionDuration: isPlaying ? '80ms' : '400ms'
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ── BOTTOM: Info / Lyrics Tabs ── */}
+              <div className="flex-1 min-h-0 flex flex-col border-t border-[#1e2030] overflow-hidden">
+
+                {/* Tab bar */}
+                <div className="flex shrink-0 px-5 pt-3 pb-0 gap-1">
+                  {[
+                    { id: 'info',   label: 'Info',   icon: <Music size={12} /> },
+                    { id: 'lyrics', label: 'Lyrics', icon: <Mic2 size={12} /> },
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => {
+                        setDesktopRightTab(tab.id);
+                        if (tab.id === 'lyrics' && currentSong && desktopLyrics === null && !lyricsLoading) {
+                          fetchDesktopLyrics(currentSong);
+                        }
+                      }}
+                      className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
+                        desktopRightTab === tab.id
+                          ? 'text-[#0f1018]'
+                          : 'text-[#4a4f62] hover:text-white hover:bg-[#1a1c2a]'
+                      }`}
+                      style={desktopRightTab === tab.id ? { backgroundColor: dominantColor } : {}}
+                    >
+                      {tab.icon}
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Tab content */}
+                <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-5 py-4">
+
+                  {/* ── INFO TAB ── */}
+                  {desktopRightTab === 'info' && (
+                    <div className="space-y-4 animate-fade-in">
+
+                      {/* Full album art */}
+                      <div
+                        className="w-full aspect-video rounded-2xl overflow-hidden relative shadow-xl"
+                        style={{ boxShadow: `0 8px 32px ${dominantColor}44` }}
+                      >
+                        <img
+                          src={getHighResImage(currentSong.thumbnail)}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 bg-black/50 backdrop-blur-sm px-2.5 py-1 rounded-full">
+                            {isPlaying ? (
+                              <>
+                                <div className="flex gap-[2px] items-end h-3">
+                                  {[0,1,2].map(b => (
+                                    <div key={b} className="w-[2px] rounded-full animate-bounce"
+                                      style={{ height: `${4+b*2}px`, backgroundColor: dominantColor, animationDelay: `${b*0.1}s` }} />
+                                  ))}
+                                </div>
+                                <span className="text-white text-[10px] font-bold">Playing</span>
+                              </>
+                            ) : (
+                              <span className="text-white/60 text-[10px] font-bold">Paused</span>
+                            )}
+                          </div>
+                          {currentSong.durationSeconds > 0 && (
+                            <span className="text-white/60 text-[10px] font-mono bg-black/50 backdrop-blur-sm px-2 py-1 rounded-full">
+                              {formatTime(currentSong.durationSeconds)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Song title & artist */}
+                      <div>
+                        <h3 className="text-white font-black text-[15px] leading-snug mb-1">
+                          {cleanTitle(currentSong.title)}
+                        </h3>
+                        <p className="text-[#6b6f80] text-[12px] font-medium">
+                          {currentSong.artist?.replace(/ - Topic| VEVO/gi, '') || 'Unknown Artist'}
+                        </p>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={(e) => toggleFavorite(e, currentSong)}
+                          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all border ${
+                            favoriteIds.has(currentSong.id)
+                              ? 'border-transparent text-[#0f1018]'
+                              : 'border-[#1e2030] text-[#6b6f80] hover:border-[#262837] hover:text-white'
+                          }`}
+                          style={favoriteIds.has(currentSong.id) ? { backgroundColor: dominantColor } : {}}
+                        >
+                          <Heart size={13} fill={favoriteIds.has(currentSong.id) ? '#0f1018' : 'none'} />
+                          {favoriteIds.has(currentSong.id) ? 'Liked' : 'Like'}
+                        </button>
+                        <button
+                          onClick={() => shareSong(currentSong)}
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider border border-[#1e2030] text-[#6b6f80] hover:border-[#262837] hover:text-white transition-all"
+                        >
+                          <Share2 size={13} />
+                          Share
+                        </button>
+                        <button
+                          onClick={() => { setDesktopRightTab('lyrics'); if (desktopLyrics === null && !lyricsLoading) fetchDesktopLyrics(currentSong); }}
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider border border-[#1e2030] text-[#6b6f80] hover:border-[#262837] hover:text-white transition-all"
+                        >
+                          <Mic2 size={13} />
+                          Lyrics
+                        </button>
+                      </div>
+
+                      {/* YouTube link */}
+                      <a
+                        href={`https://www.youtube.com/watch?v=${currentSong.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-[#1e2030] hover:border-[#262837] text-[#6b6f80] hover:text-white transition-all text-[11px] font-semibold"
+                      >
+                        <div className="w-5 h-5 bg-red-600 rounded-sm flex items-center justify-center shrink-0">
+                          <Play size={9} fill="white" className="text-white ml-0.5" />
+                        </div>
+                        Watch on YouTube
+                      </a>
+                    </div>
+                  )}
+
+                  {/* ── LYRICS TAB ── */}
+                  {desktopRightTab === 'lyrics' && (
+                    <div className="animate-fade-in">
+                      {lyricsLoading ? (
+                        /* Loading shimmer */
+                        <div className="space-y-2 pt-2">
+                          {[80, 60, 75, 55, 70, 40, 65, 50].map((w, i) => (
+                            <div key={i} className="h-3 rounded-full skeleton" style={{ width: `${w}%` }} />
+                          ))}
+                          <p className="text-[10px] text-[#4a4f62] font-bold mt-4 text-center uppercase tracking-widest">Fetching lyrics...</p>
+                        </div>
+                      ) : desktopLyrics ? (
+                        /* Lyrics content */
+                        <div>
+                          <div className="flex items-center gap-2 mb-4">
+                            <Mic2 size={13} style={{ color: dominantColor }} />
+                            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6b6f80]">
+                              {cleanTitle(currentSong.title)}
+                            </span>
+                          </div>
+                          <pre className="text-white/80 text-[12px] leading-relaxed font-sans whitespace-pre-wrap break-words">
+                            {desktopLyrics}
+                          </pre>
+                        </div>
+                      ) : (
+                        /* Not available */
+                        <div className="flex flex-col items-center justify-center py-10 text-center">
+                          <div
+                            className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+                            style={{ backgroundColor: `${dominantColor}22` }}
+                          >
+                            <Mic2 size={24} style={{ color: dominantColor }} />
+                          </div>
+                          <p className="text-white font-bold text-sm mb-1">Lyrics not available</p>
+                          <p className="text-[#4a4f62] text-[11px] leading-relaxed max-w-[200px]">
+                            We couldn't find lyrics for this song right now.
+                          </p>
+                          <button
+                            onClick={() => fetchDesktopLyrics(currentSong)}
+                            className="mt-4 px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all hover:opacity-80"
+                            style={{ backgroundColor: `${dominantColor}33`, color: dominantColor }}
+                          >
+                            Try again
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                </div>
+              </div>
+
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center px-6 opacity-30">
-              <div className="w-20 h-20 rounded-full bg-[#262837] flex items-center justify-center mb-4">
+            /* Empty state */
+            <div className="flex-1 flex flex-col items-center justify-center text-center px-6 opacity-20">
+              <div className="w-20 h-20 rounded-full bg-[#1a1c2a] flex items-center justify-center mb-4">
                 <Music size={32} />
               </div>
-              <p className="text-white font-bold">Nothing playing</p>
-              <p className="text-sm mt-1">Pick a song to start listening</p>
+              <p className="text-white font-bold text-sm">Nothing playing</p>
+              <p className="text-xs mt-1 text-[#6b6f80]">Pick a song to start</p>
             </div>
           )}
         </div>
